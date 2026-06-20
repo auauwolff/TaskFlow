@@ -1,0 +1,29 @@
+# Local infrastructure for TaskFlow.
+# Phase 0: only Postgres. The API and React app get added here in Phase 6.
+#
+#   docker compose up -d postgres     # start the database in the background
+#   docker compose ps                 # see what's running
+#   docker compose down               # stop (keeps data in the named volume)
+#   docker compose down -v            # stop AND wipe the data volume
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: taskflow-postgres
+    environment:
+      POSTGRES_USER: taskflow
+      POSTGRES_PASSWORD: taskflow_dev_pwd
+      POSTGRES_DB: taskflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - taskflow_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Lets `depends_on: condition: service_healthy` work later for the API.
+      test: ["CMD-SHELL", "pg_isready -U taskflow -d taskflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  taskflow_pgdata:
