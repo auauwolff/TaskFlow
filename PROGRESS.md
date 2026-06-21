@@ -48,8 +48,8 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 
 ## 📍 Current status
 
-- **Done:** Phase 0 ✅
-- **Next up:** Phase 1 — Domain layer
+- **Done:** Phase 0 ✅, Phase 1 ✅
+- **Next up:** Phase 2 — Application layer
 - **Last updated:** 2026-06-20
 
 ## 🗺️ Roadmap & checklist
@@ -57,7 +57,7 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 - [x] **Phase 0 — Toolchain + solution skeleton.** Install SDK, 6 projects wired with the
       dependency rule, docker-compose, gitignore, README, git init. *(Concepts: solution vs
       project, the dependency rule, the composition root.)*
-- [ ] **Phase 1 — Domain layer.** Rich `User`/`Project`/`TaskItem` entities (behavior +
+- [x] **Phase 1 — Domain layer.** Rich `User`/`Project`/`TaskItem` entities (behavior +
       guarded invariants), a value object (`Email`), domain exceptions, repository **interfaces**.
       *(SRP, encapsulation, rich-vs-anemic models, interfaces as contracts, half of DIP.)*
 - [ ] **Phase 2 — Application layer.** Use-case services, DTOs + manual mapping,
@@ -81,6 +81,24 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 4. Tell Claude "continue with Phase N" (or `/loop`-style: "pick up where PROGRESS.md says").
 
 ## 📓 Session log
+
+### 2026-06-20 — Phase 1 ✅ Domain layer
+- Built `TaskFlow.Domain` (zero dependencies). Folders: `Common/`, `Entities/`, `ValueObjects/`,
+  `Enums/`, `Exceptions/`, `Repositories/`.
+- `Entity` base (identity equality) + `ValueObject` base (value equality) — the DDD distinction.
+- `Email` value object: private ctor + static `Create` factory that validates → can't hold an invalid email.
+- Rich entities `User`, `Project`, `TaskItem`: private setters, static `Create` factories,
+  behavior methods. `TaskItem` enforces a Todo→InProgress→Done state machine via `Start/Complete/Reopen`.
+- `DomainException` for invariant violations (no HTTP/DB knowledge in the core).
+- Repository **interfaces** (`IUserRepository`, `IProjectRepository`, `ITaskItemRepository`) = ports;
+  implementations come in Phase 3.
+- `dotnet build -warnaserror` → **0 warnings, 0 errors.**
+- **Learned:** encapsulation & rich-vs-anemic models; "make illegal states unrepresentable" via
+  factory + private ctor; entity (identity) vs value-object (value) equality; SRP (one focused
+  type each); ISP (small per-aggregate repos); the *first half* of DIP — the core declares the
+  interface it needs, an outer layer will implement it.
+- **Open question for later:** `DateTimeOffset.UtcNow` inside entities is a hidden clock
+  dependency → revisit with `TimeProvider` in Phase 5.
 
 ### 2026-06-20 — Phase 0 ✅ Toolchain + skeleton
 - Installed **.NET 10.0.301** SDK + `dotnet-ef` 10.0.9 (no sudo, into `~/.dotnet`).
