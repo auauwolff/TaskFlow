@@ -48,9 +48,9 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 
 ## 📍 Current status
 
-- **Done:** Phase 0 ✅, Phase 1 ✅
-- **Next up:** Phase 2 — Application layer
-- **Last updated:** 2026-06-20
+- **Done:** Phase 0 ✅, Phase 1 ✅, Phase 2 ✅
+- **Next up:** Phase 3 — Infrastructure layer (EF Core + Postgres). **Docker must be installed for this phase.**
+- **Last updated:** 2026-06-21
 
 ## 🗺️ Roadmap & checklist
 
@@ -60,8 +60,10 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 - [x] **Phase 1 — Domain layer.** Rich `User`/`Project`/`TaskItem` entities (behavior +
       guarded invariants), a value object (`Email`), domain exceptions, repository **interfaces**.
       *(SRP, encapsulation, rich-vs-anemic models, interfaces as contracts, half of DIP.)*
-- [ ] **Phase 2 — Application layer.** Use-case services, DTOs + manual mapping,
-      FluentValidation, `IUnitOfWork`, a Factory. *(OCP, ISP, Factory, depend-on-abstractions.)*
+- [x] **Phase 2 — Application layer.** Use-case services, DTOs (records) + manual mapping,
+      FluentValidation, `IUnitOfWork`, application exceptions, `AddApplication()` DI extension.
+      *(OCP, ISP, depend-on-abstractions, DI consumer side. Factory pattern discussed but
+      deferred via YAGNI — static `Create` methods cover us until a real need appears.)*
 - [ ] **Phase 3 — Infrastructure layer.** EF Core `DbContext`, entity configs, repository
       **implementations**, `UnitOfWork`, first migration, Postgres in Docker. *(Repository +
       Unit of Work, the payoff of DIP.)*
@@ -81,6 +83,25 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 4. Tell Claude "continue with Phase N" (or `/loop`-style: "pick up where PROGRESS.md says").
 
 ## 📓 Session log
+
+### 2026-06-21 — Phase 2 ✅ Application layer
+- Added packages: FluentValidation 12.1.1 (+ DI extensions), Microsoft.Extensions.DependencyInjection.Abstractions 10.0.9.
+- Per-feature folders `Users/`, `Projects/`, `Tasks/` + `Common/` (`IUnitOfWork`, `NotFoundException`, `ConflictException`).
+- DTOs as `record`s (immutable, value-equality), kept separate from entities; manual `ToDto()` mappings (no AutoMapper).
+- FluentValidation validators in their own classes (OCP); services inject `IValidator<T>` and call `ValidateAndThrowAsync`.
+- Use-case services `UserService`/`ProjectService`/`TaskService` (+ interfaces): constructor-inject
+  ONLY interfaces (repos from Domain, `IUnitOfWork`, validators). Pattern: validate → enforce
+  app rules (uniqueness, cross-aggregate existence) → call domain `Create`/behavior → repo.Add +
+  `uow.SaveChanges` → return DTO. Domain rules stay in entities (`task.Complete()`); services orchestrate.
+- `DependencyInjection.AddApplication()` registers services (Scoped) + validators by assembly scan.
+- `dotnet build -warnaserror` → **0 warnings, 0 errors.**
+- **Learned:** rules-in-Domain vs orchestration-in-Application made concrete; DTOs & why they're
+  separate from entities; FluentValidation = OCP; per-aggregate services/repos = ISP; the
+  *consumer* side of DI (ctor takes interfaces, never `new`s a concrete); layered exceptions
+  (NotFound→404, Conflict→409, mapped in Phase 4); per-layer DI registration extension.
+- **Decisions:** repository interfaces kept in Domain, `IUnitOfWork` in Application (orchestration
+  concern). Exposed domain enums in DTOs (simple coupling, noted). Used exceptions over a Result
+  pattern for now (Result is a deferred upgrade). Skipped a standalone Factory class (YAGNI).
 
 ### 2026-06-20 — Phase 1 ✅ Domain layer
 - Built `TaskFlow.Domain` (zero dependencies). Folders: `Common/`, `Entities/`, `ValueObjects/`,

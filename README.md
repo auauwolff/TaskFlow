@@ -1,12 +1,12 @@
 # TaskFlow
 
 A small task/project manager built **from scratch** as a hands-on way to learn
-backend C# / .NET the *clean* way: Clean Architecture, SOLID, dependency
+backend C# / .NET the _clean_ way: Clean Architecture, SOLID, dependency
 injection, interfaces, and the common design patterns — each one introduced
 where it actually earns its keep, not in the abstract.
 
 The app itself is deliberately simple (`User` → `Project` → `TaskItem`). The
-point is the *architecture*, not the features.
+point is the _architecture_, not the features.
 
 ## Stack
 
@@ -36,15 +36,15 @@ outer ones.
         └─────────────────────────────────────────┘
 ```
 
-| Project | Depends on | Responsibility |
-|---|---|---|
-| `TaskFlow.Domain` | *(nothing)* | Entities, value objects, domain rules, repository **interfaces**. |
-| `TaskFlow.Application` | Domain | Use-case services, DTOs, validators, infrastructure **interfaces**. |
-| `TaskFlow.Infrastructure` | Application, Domain | EF Core `DbContext`, repository **implementations**, migrations. |
-| `TaskFlow.Api` | Application, Infrastructure | Controllers, DI wiring (composition root), middleware. |
+| Project                   | Depends on                  | Responsibility                                                      |
+| ------------------------- | --------------------------- | ------------------------------------------------------------------- |
+| `TaskFlow.Domain`         | _(nothing)_                 | Entities, value objects, domain rules, repository **interfaces**.   |
+| `TaskFlow.Application`    | Domain                      | Use-case services, DTOs, validators, infrastructure **interfaces**. |
+| `TaskFlow.Infrastructure` | Application, Domain         | EF Core `DbContext`, repository **implementations**, migrations.    |
+| `TaskFlow.Api`            | Application, Infrastructure | Controllers, DI wiring (composition root), middleware.              |
 
 The references are enforced by the compiler: if `Domain` ever tried to reference
-`Infrastructure`, the build would fail. The constraint *is* the lesson.
+`Infrastructure`, the build would fail. The constraint _is_ the lesson.
 
 ## Getting started
 
@@ -74,3 +74,5 @@ dotnet test
 - **Phase 4** Api — thin controllers, DI composition root, middleware, Serilog, Swagger.
 - **Phase 5** Tests — unit-testing the domain and application layers.
 - **Phase 6** React + TypeScript client, full-stack `docker compose`.
+
+claude --resume 4e7be066-adaa-4849-a79d-9c6384c22142
