@@ -12,17 +12,20 @@ public sealed class ProjectService : IProjectService
     private readonly IUserRepository _users;          // needed to verify the owner exists
     private readonly IUnitOfWork _unitOfWork;
     private readonly IValidator<CreateProjectRequest> _validator;
+    private readonly TimeProvider _timeProvider;
 
     public ProjectService(
         IProjectRepository projects,
         IUserRepository users,
         IUnitOfWork unitOfWork,
-        IValidator<CreateProjectRequest> validator)
+        IValidator<CreateProjectRequest> validator,
+        TimeProvider timeProvider)
     {
         _projects = projects;
         _users = users;
         _unitOfWork = unitOfWork;
         _validator = validator;
+        _timeProvider = timeProvider;
     }
 
     public async Task<ProjectDto> CreateAsync(CreateProjectRequest request, CancellationToken cancellationToken = default)
@@ -35,7 +38,7 @@ public sealed class ProjectService : IProjectService
         if (await _users.GetByIdAsync(request.OwnerId, cancellationToken) is null)
             throw new NotFoundException(nameof(User), request.OwnerId);
 
-        var project = Project.Create(request.Name, request.OwnerId, request.Description);
+        var project = Project.Create(request.Name, request.OwnerId, _timeProvider, request.Description);
 
         await _projects.AddAsync(project, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

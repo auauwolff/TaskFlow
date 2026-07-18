@@ -72,7 +72,7 @@ dotnet test
 - **Phase 2** Application layer — use-case services, DTOs, validation, factory.
 - **Phase 3** Infrastructure — EF Core + Postgres, repositories, migrations.
 - **Phase 4** ✅ Api — thin controllers, DI composition root, ProblemDetails, Serilog, Swagger.
-- **Phase 5** Tests — unit-testing the domain and application layers.
+- **Phase 5** ✅ Tests — pure Domain tests and Application tests with substituted ports.
 - **Phase 6** React + TypeScript client, full-stack `docker compose`.
 
 cld --resume 4e7be066-adaa-4849-a79d-9c6384c22142

@@ -35,7 +35,7 @@ public sealed class TaskItem : Entity
     }
 
     public static TaskItem Create(
-        Guid projectId, string title,
+        Guid projectId, string title, TimeProvider timeProvider,
         TaskPriority priority = TaskPriority.Medium, string? description = null)
     {
         if (projectId == Guid.Empty)
@@ -46,7 +46,7 @@ public sealed class TaskItem : Entity
         // A brand-new task always starts in Todo — the entity controls its own initial state.
         return new TaskItem(
             Guid.NewGuid(), projectId, title.Trim(), description,
-            TaskItemStatus.Todo, priority, DateTimeOffset.UtcNow);
+            TaskItemStatus.Todo, priority, timeProvider.GetUtcNow());
     }
 
     /// <summary>Move the task into progress. A finished task must be reopened first.</summary>
@@ -59,13 +59,13 @@ public sealed class TaskItem : Entity
     }
 
     /// <summary>Mark the task done. Idempotent: completing an already-done task is a no-op.</summary>
-    public void Complete()
+    public void Complete(TimeProvider timeProvider)
     {
         if (Status == TaskItemStatus.Done)
             return;
 
         Status = TaskItemStatus.Done;
-        CompletedAt = DateTimeOffset.UtcNow;
+        CompletedAt = timeProvider.GetUtcNow();
     }
 
     /// <summary>Send a completed task back to Todo, clearing its completion timestamp.</summary>

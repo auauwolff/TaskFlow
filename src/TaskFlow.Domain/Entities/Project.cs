@@ -25,17 +25,18 @@ public sealed class Project : Entity
         CreatedAt = createdAt;
     }
 
-    public static Project Create(string name, Guid ownerId, string? description = null)
+    public static Project Create(
+        string name,
+        Guid ownerId,
+        TimeProvider timeProvider,
+        string? description = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("Project name is required.");
         if (ownerId == Guid.Empty)
             throw new DomainException("A project must have an owner.");
 
-        // NOTE (testability): reading the clock here is a hidden dependency on "now" — it makes
-        // time-based tests awkward. It's fine while learning; in Phase 5 we'll talk about
-        // injecting .NET's TimeProvider so the clock becomes a controllable dependency.
-        return new Project(Guid.NewGuid(), name.Trim(), description, ownerId, DateTimeOffset.UtcNow);
+        return new Project(Guid.NewGuid(), name.Trim(), description, ownerId, timeProvider.GetUtcNow());
     }
 
     public void Rename(string name)

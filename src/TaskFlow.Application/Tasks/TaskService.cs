@@ -14,6 +14,7 @@ public sealed class TaskService : ITaskService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IValidator<CreateTaskRequest> _createValidator;
     private readonly IValidator<AssignTaskRequest> _assignValidator;
+    private readonly TimeProvider _timeProvider;
 
     public TaskService(
         ITaskItemRepository tasks,
@@ -21,7 +22,8 @@ public sealed class TaskService : ITaskService
         IUserRepository users,
         IUnitOfWork unitOfWork,
         IValidator<CreateTaskRequest> createValidator,
-        IValidator<AssignTaskRequest> assignValidator)
+        IValidator<AssignTaskRequest> assignValidator,
+        TimeProvider timeProvider)
     {
         _tasks = tasks;
         _projects = projects;
@@ -29,6 +31,7 @@ public sealed class TaskService : ITaskService
         _unitOfWork = unitOfWork;
         _createValidator = createValidator;
         _assignValidator = assignValidator;
+        _timeProvider = timeProvider;
     }
 
     public async Task<TaskItemDto> CreateAsync(CreateTaskRequest request, CancellationToken cancellationToken = default)
@@ -38,7 +41,12 @@ public sealed class TaskService : ITaskService
         if (await _projects.GetByIdAsync(request.ProjectId, cancellationToken) is null)
             throw new NotFoundException(nameof(Project), request.ProjectId);
 
-        var task = TaskItem.Create(request.ProjectId, request.Title, request.Priority, request.Description);
+        var task = TaskItem.Create(
+            request.ProjectId,
+            request.Title,
+            _timeProvider,
+            request.Priority,
+            request.Description);
 
         await _tasks.AddAsync(task, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -66,8 +74,8 @@ public sealed class TaskService : ITaskService
                    ?? throw new NotFoundException(nameof(TaskItem), id);
 
         // The RULE lives in the entity. The service only orchestrates: load -> act -> save.
-        // If the task is already Done, TaskItem.Complete() is a no-op (idempotent).
-        task.Complete();
+        // If the task is already Done, TaskItem.Complete is a no-op (idempotent).
+        task.Complete(_timeProvider);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return task.ToDto();

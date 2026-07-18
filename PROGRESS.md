@@ -48,8 +48,8 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 
 ## 📍 Current status
 
-- **Done:** Phase 0 ✅, Phase 1 ✅, Phase 2 ✅, Phase 3 ✅, Phase 4 ✅
-- **Next up:** Phase 5 — domain and application tests (xUnit, NSubstitute, FluentAssertions), including the hidden clock dependency.
+- **Done:** Phase 0 ✅, Phase 1 ✅, Phase 2 ✅, Phase 3 ✅, Phase 4 ✅, Phase 5 ✅
+- **Next up:** Phase 6 — React + TypeScript client and full-stack Docker Compose.
 - **Last updated:** 2026-07-18
 
 ## 🗺️ Roadmap & checklist
@@ -73,7 +73,7 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 - [x] **Phase 4 — Api layer.** Thin controllers, DI composition root (`AddApplication()` /
       `AddInfrastructure()`, service lifetimes), exception middleware → ProblemDetails, Serilog,
       Options pattern, Swagger UI. *(DI end-to-end, middleware, options.)*
-- [ ] **Phase 5 — Tests.** Pure domain tests; application tests with mocked repositories.
+- [x] **Phase 5 — Tests.** Pure domain tests; application tests with mocked repositories.
       *(Why DI makes code testable; LSP.)*
 - [ ] **Phase 6 — React client + full-stack docker compose.**
 - [ ] *Optional upgrades:* MediatR/CQRS, Result pattern, Decorator (caching/logging), Testcontainers.
@@ -86,6 +86,30 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 4. Tell Claude "continue with Phase N" (or `/loop`-style: "pick up where PROGRESS.md says").
 
 ## 📓 Session log
+
+### 2026-07-18 — Phase 5 ✅ Domain + Application unit tests
+- Added xUnit tests with Apache-licensed FluentAssertions 7.2.2; Application tests use NSubstitute 6.0
+  to replace repository and `IUnitOfWork` ports. No API, EF Core, PostgreSQL, or Docker is involved.
+- **27 Domain tests:** email validation/canonicalization/value equality; user/project invariants and
+  atomic failed mutations; deterministic project creation; task defaults, assignment, and the full
+  Todo/InProgress/Done state machine including idempotent completion and reopening.
+- **16 Application tests:** create/get/list/complete/assign orchestration, DTO mapping, owner/project/
+  assignee existence checks, validation short-circuiting, and negative assertions such as “never save
+  after a conflict or missing dependency.”
+- Replaced hidden `DateTimeOffset.UtcNow` reads with explicit .NET `TimeProvider` dependencies.
+  Production DI registers `TimeProvider.System`; tests supply a tiny fixed provider and assert exact
+  timestamps without sleeping or using flaky time ranges.
+- This demonstrates the practical payoff of DIP and LSP: NSubstitute implementations stand in for the
+  real EF adapters because they obey the same interfaces, while services remain unchanged.
+- Coverage run: Domain suite ~90% line / ~74% branch; Application suite ~75% line / 50% branch (the
+  latter includes untested validators/mappings and transitive code, so coverage remains a guide, not a goal).
+- Rebuilt and smoke-tested the live API after the clock refactor; DI resolved `TimeProvider` and existing
+  project/task reads still succeeded against PostgreSQL.
+- `dotnet build --warnaserror` → **0 warnings, 0 errors**; `dotnet test` → **43/43 passed**; NuGet audit
+  → no known vulnerable packages.
+- **Learned:** arrange/act/assert; fact vs theory; state-based vs interaction-based testing; substitutes
+  at architectural boundaries; testing failure paths and absence of side effects; deterministic clocks;
+  tests as executable documentation rather than implementation-detail snapshots.
 
 ### 2026-07-18 — Phase 4 ✅ Api layer (controllers + composition root)
 - Added thin `UsersController`, `ProjectsController`, and `TasksController`; the ten routes mirror
@@ -175,8 +199,8 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
   factory + private ctor; entity (identity) vs value-object (value) equality; SRP (one focused
   type each); ISP (small per-aggregate repos); the *first half* of DIP — the core declares the
   interface it needs, an outer layer will implement it.
-- **Open question for later:** `DateTimeOffset.UtcNow` inside entities is a hidden clock
-  dependency → revisit with `TimeProvider` in Phase 5.
+- **Resolved in Phase 5:** `DateTimeOffset.UtcNow` was replaced by explicit `TimeProvider` arguments;
+  production uses the system provider and tests use deterministic fixed time.
 
 ### 2026-06-20 — Phase 0 ✅ Toolchain + skeleton
 - Installed **.NET 10.0.301** SDK + `dotnet-ef` 10.0.9 (no sudo, into `~/.dotnet`).

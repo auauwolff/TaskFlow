@@ -15,6 +15,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
+        services.AddSingleton(TimeProvider.System);
+
         // Scoped = one instance per web request, the natural lifetime for use-case work.
         // (We'll unpack Scoped vs Transient vs Singleton properly in Phase 4.)
         services.AddScoped<IUserService, UserService>();
