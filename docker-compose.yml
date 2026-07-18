@@ -1,5 +1,5 @@
 # Local infrastructure for TaskFlow.
-# Phase 0: only Postgres. The API and React app get added here in Phase 6.
+# Currently only Postgres. API and frontend services are the next Phase 6 increment.
 #
 #   docker compose up -d postgres     # start the database in the background
 #   docker compose ps                 # see what's running

@@ -40,7 +40,7 @@ The app (a task/project manager) is intentionally trivial. **The architecture is
 | Logging | Serilog | Phase 4. |
 | API docs | `Microsoft.AspNetCore.OpenApi` (+ Swagger UI later) | .NET 10 dropped Swashbuckle from the template. |
 | Tests | xUnit + NSubstitute + FluentAssertions | Phase 5. |
-| Frontend | React + Vite + TypeScript | Phase 6 (my strength — light touch). |
+| Frontend | React 19 + Vite + TypeScript + TanStack Router/Query + XState (pnpm) | Feature-first Hexagonal Architecture; ASP.NET remains the single backend. |
 | Solution file | **`.slnx`** (new XML format) | .NET 10 default. |
 
 **Deferred on purpose** (introduced later as "upgrades" so I feel the problem they solve):
@@ -49,8 +49,8 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 ## 📍 Current status
 
 - **Done:** Phase 0 ✅, Phase 1 ✅, Phase 2 ✅, Phase 3 ✅, Phase 4 ✅, Phase 5 ✅
-- **Next up:** Phase 6 — React + TypeScript client and full-stack Docker Compose.
-- **Last updated:** 2026-07-18
+- **In progress:** Phase 6 — user/project frontend integration complete; tasks and full-stack Docker Compose next.
+- **Last updated:** 2026-07-19
 
 ## 🗺️ Roadmap & checklist
 
@@ -81,11 +81,45 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 ## ⏯️ How to resume after a break
 
 1. Read **Current status** above.
-2. `cd /home/wolffo/Dev/TaskFlow && dotnet build` — confirm it still compiles.
+2. `cd /home/wolffo/Dev/TaskFlow && dotnet build backend/TaskFlow.slnx` — confirm it still compiles.
 3. Skim the **Session log** entry for the last phase to recall the "why".
 4. Tell Claude "continue with Phase N" (or `/loop`-style: "pick up where PROGRESS.md says").
 
 ## 📓 Session log
+
+### 2026-07-19 — Phase 6b 🚧 Frontend hexagon + first live vertical slice
+- Documented the frontend dependency rule and state-ownership matrix in `frontend/ARCHITECTURE.md`.
+  Features own domain/application/adapters/presentation layers; the `app` folder is the composition root.
+- Generated TypeScript transport contracts from the live ASP.NET OpenAPI document and contained
+  `openapi-fetch` plus Problem Details mapping inside HTTP adapters. Components never import wire DTOs.
+- Added narrow `UsersGateway`, `ProjectsGateway`, and `CurrentUserStorage` ports with HTTP/localStorage
+  adapters. The pure session service coordinates restore/create/clear and is tested with fake ports.
+- Added an XState session workflow: restore stored user → anonymous/ready, create user → ready, stale
+  IDs clear automatically, restore failures retry explicitly, and changing user clears local identity.
+- Added TanStack Query only for project server state. `useProjectsPageModel` hides Query details and
+  returns a feature-owned discriminated union consumed by the project page.
+- Added Dependency Cruiser rules for inward layer dependencies and cycles; `pnpm architecture` now
+  fails when frontend code violates the documented hexagonal boundaries.
+- Connected the first real flow: create/restore a development user, list their projects, and create a
+  project. Vite proxies `/api` to ASP.NET, avoiding a development CORS policy.
+- Added seven Vitest tests for session orchestration, success/failure XState transitions, resilient
+  sign-out behavior, and Problem Details mapping.
+- Live smoke test created a user and project through `http://localhost:5173/api`, proving the Vite proxy,
+  generated contract assumptions, API, Application layer, EF Core, and PostgreSQL work end to end.
+- **Next:** expose the missing task transitions/contracts as needed, integrate task Query/view models,
+  fix string-enum representation in generated OpenAPI before consuming task DTOs, then add containers.
+
+### 2026-07-19 — Phase 6a 🚧 Repository split + frontend scaffold
+- Reorganized the single repository into explicit `backend/` and `frontend/` application boundaries;
+  moved the solution, `src/`, and `tests/` together so all internal .NET project references stay valid.
+- Scaffolded the client with pnpm, React 19, TypeScript, and Vite. Added TanStack Router's file-based
+  Vite plugin, a root layout, and one minimal index route; no API, Query, forms, or UI library yet.
+- Chose TanStack Router without TanStack Start: TaskFlow already has an ASP.NET backend and does not
+  currently need a second server runtime, SSR, server functions, or React API routes.
+- Kept Docker Compose focused on PostgreSQL for this increment. API/frontend containers and the Vite
+  `/api` development proxy belong to the next vertical slice.
+- Verification: strict backend build produced **0 warnings/errors**, all **43 tests passed**, frontend
+  lint and production build passed, and `docker compose config` validated the root Compose file.
 
 ### 2026-07-18 — Phase 5 ✅ Domain + Application unit tests
 - Added xUnit tests with Apache-licensed FluentAssertions 7.2.2; Application tests use NSubstitute 6.0
