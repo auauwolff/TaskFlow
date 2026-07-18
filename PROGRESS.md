@@ -35,7 +35,7 @@ The app (a task/project manager) is intentionally trivial. **The architecture is
 | Runtime | **.NET 10.0.301 (LTS)** | Installed to `~/.dotnet` via `dotnet-install.sh` (no sudo). PATH set in `~/.bashrc` + `~/.profile`. |
 | API | ASP.NET Core Web API, **controllers** (not Minimal API) | Layering stays explicit. |
 | Architecture | **Clean Architecture** — Domain / Application / Infrastructure / Api | The dependency rule is compiler-enforced. |
-| ORM / DB | **EF Core + Npgsql + PostgreSQL** (Docker) | `docker compose up -d postgres`. **Docker not installed yet — do this in Phase 3.** |
+| ORM / DB | **EF Core 10 + Npgsql + PostgreSQL 17** (Docker) | Docker Engine 29.6.0 installed. Start DB with `sg docker -c "docker compose -f /home/wolffo/Dev/TaskFlow/docker-compose.yml up -d postgres"` (the `sg docker` prefix borrows the docker group without a re-login). |
 | Validation | FluentValidation | Phase 2. |
 | Logging | Serilog | Phase 4. |
 | API docs | `Microsoft.AspNetCore.OpenApi` (+ Swagger UI later) | .NET 10 dropped Swashbuckle from the template. |
@@ -48,9 +48,9 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 
 ## 📍 Current status
 
-- **Done:** Phase 0 ✅, Phase 1 ✅, Phase 2 ✅
-- **Next up:** Phase 3 — Infrastructure layer (EF Core + Postgres). **Docker must be installed for this phase.**
-- **Last updated:** 2026-06-21
+- **Done:** Phase 0 ✅, Phase 1 ✅, Phase 2 ✅, Phase 3 ✅
+- **Next up:** Phase 4 — Api layer (thin controllers, composition root, exception middleware, Serilog, Swagger). **First fully runnable API.**
+- **Last updated:** 2026-06-24
 
 ## 🗺️ Roadmap & checklist
 
@@ -64,9 +64,12 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
       FluentValidation, `IUnitOfWork`, application exceptions, `AddApplication()` DI extension.
       *(OCP, ISP, depend-on-abstractions, DI consumer side. Factory pattern discussed but
       deferred via YAGNI — static `Create` methods cover us until a real need appears.)*
-- [ ] **Phase 3 — Infrastructure layer.** EF Core `DbContext`, entity configs, repository
-      **implementations**, `UnitOfWork`, first migration, Postgres in Docker. *(Repository +
-      Unit of Work, the payoff of DIP.)*
+- [x] **Phase 3 — Infrastructure layer.** EF Core `DbContext` (also implements `IUnitOfWork`),
+      one `IEntityTypeConfiguration<T>` per entity, repository **implementations** (adapters),
+      design-time factory, `AddInfrastructure()`, `InitialCreate` migration applied to live Postgres.
+      *(Repository + Unit of Work, the payoff of DIP, entity→schema translation, value-object/enum
+      persistence via converters. Kept Domain untouched — EF constructor binding instead of adding
+      parameterless ctors.)*
 - [ ] **Phase 4 — Api layer.** Thin controllers, DI composition root (`AddApplication()` /
       `AddInfrastructure()`, service lifetimes), exception middleware → ProblemDetails, Serilog,
       Options pattern, Swagger UI. *(DI end-to-end, middleware, options.)*
@@ -83,6 +86,33 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 4. Tell Claude "continue with Phase N" (or `/loop`-style: "pick up where PROGRESS.md says").
 
 ## 📓 Session log
+
+### 2026-06-24 — Phase 3 ✅ Infrastructure layer (EF Core + Postgres)
+- Installed Docker Engine 29.6.0; Postgres 17 running as `taskflow-postgres` (healthy on 5432).
+  Driven from the agent shell via `sg docker -c "..."` (borrows docker group without a re-login).
+- Packages: Npgsql.EntityFrameworkCore.PostgreSQL 10.0.2, Microsoft.EntityFrameworkCore.Design 10.0.9
+  (PrivateAssets=all — build-time tool only), EFCore.NamingConventions 10.0.1.
+- `TaskFlowDbContext : DbContext, IUnitOfWork` — EF's built-in `SaveChangesAsync` satisfies the
+  `IUnitOfWork` port with zero extra code. DbSets: Users / Projects / Tasks.
+- One `IEntityTypeConfiguration<T>` per entity (SRP for mapping): `Email` value object → single
+  string column via `HasConversion`; enums → text via `HasConversion<string>`; unique index on
+  `email`; indexes on `owner_id` / `project_id` / `assignee_id`. snake_case via the convention.
+- Repository **implementations** = the ADAPTERS that plug into the Domain ports; they inject the
+  concrete `TaskFlowDbContext`. `GetById*` tracked (load→mutate→save); `List*` `AsNoTracking` (read-only→DTO).
+- `TaskFlowDbContextFactory : IDesignTimeDbContextFactory` so `dotnet ef` works before the Api exists.
+- `AddInfrastructure(connectionString)`: `AddDbContext` (Scoped); `IUnitOfWork` → the SAME DbContext
+  instance (shared change-tracker); 3 repos. Composition root proper is the Api in Phase 4.
+- Generated `InitialCreate` **without touching the Domain** — EF constructor binding rebuilt entities
+  through their private ctors (incl. value-converted `Email` + enums). Applied to live Postgres,
+  verified tables/columns/indexes + `__EFMigrationsHistory` row in `psql`.
+- **Learned:** entity→schema is a real translation done HERE (the migration is the proof, not the
+  entity); Repository + Unit of Work are the payoff of DIP (adapters fulfil inner-layer ports);
+  migrations are versioned + reversible (`Up`/`Down`); value-object & enum persistence via converters;
+  tracked vs `AsNoTracking`; the design-time factory.
+- **Decisions:** enums as text (inspectable, reorder-safe); no cross-aggregate FK constraints, only
+  indexes (integrity enforced in app/domain at the aggregate boundary); Domain left untouched.
+- **To verify in Phase 4 (live API):** the `u.Email == email` LINQ translation through the value
+  converter in `GetByEmailAsync` — couldn't exercise it without a running query.
 
 ### 2026-06-21 — Phase 2 ✅ Application layer
 - Added packages: FluentValidation 12.1.1 (+ DI extensions), Microsoft.Extensions.DependencyInjection.Abstractions 10.0.9.

@@ -75,4 +75,4 @@ dotnet test
 - **Phase 5** Tests — unit-testing the domain and application layers.
 - **Phase 6** React + TypeScript client, full-stack `docker compose`.
 
-claude --resume 4e7be066-adaa-4849-a79d-9c6384c22142
+cld --resume 4e7be066-adaa-4849-a79d-9c6384c22142
