@@ -48,9 +48,9 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 
 ## 📍 Current status
 
-- **Done:** Phase 0 ✅, Phase 1 ✅, Phase 2 ✅, Phase 3 ✅
-- **Next up:** Phase 4 — Api layer (thin controllers, composition root, exception middleware, Serilog, Swagger). **First fully runnable API.**
-- **Last updated:** 2026-06-24
+- **Done:** Phase 0 ✅, Phase 1 ✅, Phase 2 ✅, Phase 3 ✅, Phase 4 ✅
+- **Next up:** Phase 5 — domain and application tests (xUnit, NSubstitute, FluentAssertions), including the hidden clock dependency.
+- **Last updated:** 2026-07-18
 
 ## 🗺️ Roadmap & checklist
 
@@ -70,7 +70,7 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
       *(Repository + Unit of Work, the payoff of DIP, entity→schema translation, value-object/enum
       persistence via converters. Kept Domain untouched — EF constructor binding instead of adding
       parameterless ctors.)*
-- [ ] **Phase 4 — Api layer.** Thin controllers, DI composition root (`AddApplication()` /
+- [x] **Phase 4 — Api layer.** Thin controllers, DI composition root (`AddApplication()` /
       `AddInfrastructure()`, service lifetimes), exception middleware → ProblemDetails, Serilog,
       Options pattern, Swagger UI. *(DI end-to-end, middleware, options.)*
 - [ ] **Phase 5 — Tests.** Pure domain tests; application tests with mocked repositories.
@@ -86,6 +86,33 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 4. Tell Claude "continue with Phase N" (or `/loop`-style: "pick up where PROGRESS.md says").
 
 ## 📓 Session log
+
+### 2026-07-18 — Phase 4 ✅ Api layer (controllers + composition root)
+- Added thin `UsersController`, `ProjectsController`, and `TasksController`; the ten routes mirror
+  existing Application service methods and never call repositories or Domain entities directly.
+- `Program.cs` is now the real composition root: `AddApplication()` binds service interfaces,
+  `AddInfrastructure()` binds repositories/`IUnitOfWork`, and ASP.NET constructor-injects the graph.
+- Runtime connection string comes from `ConnectionStrings:TaskFlow` in development configuration and
+  fails fast if absent. EF design-time commands continue to use Infrastructure's design-time factory.
+- Added one `IExceptionHandler`: FluentValidation/Domain → 400, not found → 404, conflict → 409,
+  unknown → safe 500; all use RFC ProblemDetails with a trace id. Controllers need no `try/catch`.
+- Added Serilog console + request logging, first-party OpenAPI generation, development-only Swagger UI,
+  and string enum JSON (`"High"`, `"Todo"`) for a readable frontend contract.
+- Used the built-in `ConnectionStrings` configuration convention instead of inventing an unused typed
+  Options class; strongly typed `IOptions<T>` is deferred until Phase 6 introduces a real setting such
+  as allowed frontend origins.
+- Live PostgreSQL verification: created user → project → task, completed task (`Todo` → `Done`), listed
+  projects, and exercised 400/404/409 responses. Swagger and `/openapi/v1.json` both served successfully.
+- Verified EF translates the `Email` value-object lookup to SQL. Found and fixed a real mismatch:
+  Domain equality was case-insensitive while PostgreSQL text uniqueness was case-sensitive; `Email.Create`
+  now stores one lowercase canonical form, aligning equality, queries, and the unique index.
+- Strict build exposed and fixed package issues: patched vulnerable `Microsoft.OpenApi` to 2.7.5 and made
+  EF Core/Relational 10.0.9 direct Infrastructure dependencies to prevent transitive version drift.
+- **Learned:** controller = HTTP adapter; `Program.cs` = composition root; DI resolves the complete object
+  graph per request; middleware handles cross-cutting concerns once; ProblemDetails is the error DTO;
+  OpenAPI describes the HTTP contract; logging observes the request without entering business code.
+- `dotnet build --warnaserror` → **0 warnings, 0 errors.** Test projects build but remain empty by design
+  until Phase 5.
 
 ### 2026-06-24 — Phase 3 ✅ Infrastructure layer (EF Core + Postgres)
 - Installed Docker Engine 29.6.0; Postgres 17 running as `taskflow-postgres` (healthy on 5432).
@@ -111,8 +138,8 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
   tracked vs `AsNoTracking`; the design-time factory.
 - **Decisions:** enums as text (inspectable, reorder-safe); no cross-aggregate FK constraints, only
   indexes (integrity enforced in app/domain at the aggregate boundary); Domain left untouched.
-- **To verify in Phase 4 (live API):** the `u.Email == email` LINQ translation through the value
-  converter in `GetByEmailAsync` — couldn't exercise it without a running query.
+- **Verified in Phase 4:** `u.Email == email` translates through the value converter to a parameterized
+  PostgreSQL predicate; live testing also led to lowercase canonicalization for consistent uniqueness.
 
 ### 2026-06-21 — Phase 2 ✅ Application layer
 - Added packages: FluentValidation 12.1.1 (+ DI extensions), Microsoft.Extensions.DependencyInjection.Abstractions 10.0.9.

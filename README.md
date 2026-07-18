@@ -56,7 +56,7 @@ dotnet build
 docker compose up -d postgres
 
 # 3. Apply migrations (Phase 3+)
-dotnet ef database update --project src/TaskFlow.Infrastructure --startup-project src/TaskFlow.Api
+dotnet ef database update --project src/TaskFlow.Infrastructure --startup-project src/TaskFlow.Infrastructure
 
 # 4. Run the API (Phase 4+)
 dotnet run --project src/TaskFlow.Api
@@ -71,7 +71,7 @@ dotnet test
 - **Phase 1** Domain layer — rich entities, value objects, repository interfaces.
 - **Phase 2** Application layer — use-case services, DTOs, validation, factory.
 - **Phase 3** Infrastructure — EF Core + Postgres, repositories, migrations.
-- **Phase 4** Api — thin controllers, DI composition root, middleware, Serilog, Swagger.
+- **Phase 4** ✅ Api — thin controllers, DI composition root, ProblemDetails, Serilog, Swagger.
 - **Phase 5** Tests — unit-testing the domain and application layers.
 - **Phase 6** React + TypeScript client, full-stack `docker compose`.
 

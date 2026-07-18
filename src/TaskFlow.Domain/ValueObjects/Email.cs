@@ -21,7 +21,9 @@ public sealed class Email : ValueObject
         if (string.IsNullOrWhiteSpace(value))
             throw new DomainException("Email cannot be empty.");
 
-        value = value.Trim();
+        // One canonical representation keeps Domain equality, repository lookups and the
+        // database's unique text index consistent.
+        value = value.Trim().ToLowerInvariant();
 
         // Deliberately minimal — exactly one '@', not at the very start or end. Heavier,
         // user-facing validation belongs in the Application layer's validators (Phase 2).
