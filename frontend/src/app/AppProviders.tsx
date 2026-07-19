@@ -1,9 +1,9 @@
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { useEffect, type PropsWithChildren } from 'react'
 import { ProjectsGatewayContext } from '@/features/projects/presentation/projectsGatewayContext'
+import { transitionToAnonymousSession } from '@/features/session/presentation/current-session/sessionCache'
 import { useSession } from '@/features/session/presentation/current-session/useSession'
 import { SessionServiceContext } from '@/features/session/presentation/sessionContext'
-import { removeAuthenticatedQueries } from '@/shared/query/authenticatedQueries'
 import type { AppRuntime } from './composition'
 
 interface AppProvidersProps extends PropsWithChildren {
@@ -29,7 +29,7 @@ function AuthenticatedCacheBoundary({ children }: PropsWithChildren) {
   useEffect(() => {
     if (session.status !== 'anonymous') return
 
-    removeAuthenticatedQueries(queryClient)
+    transitionToAnonymousSession(queryClient)
   }, [queryClient, session.status])
 
   return children

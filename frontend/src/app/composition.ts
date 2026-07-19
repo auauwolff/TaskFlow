@@ -3,6 +3,7 @@ import type { ProjectsGateway } from '@/features/projects/application/ports'
 import { HttpProjectsGateway } from '@/features/projects/adapters/httpProjectsGateway'
 import { HttpAuthenticationGateway } from '@/features/session/adapters/httpAuthenticationGateway'
 import { SessionService, type SessionUseCases } from '@/features/session/application/sessionService'
+import { transitionToAnonymousSession } from '@/features/session/presentation/current-session/sessionCache'
 import { createApiClient } from '@/shared/api/client'
 import { HttpAntiforgeryClient } from '@/shared/api/antiforgery'
 import { AppError } from '@/shared/errors/appError'
@@ -14,14 +15,15 @@ export interface AppRuntime {
 }
 
 export function createAppRuntime(): AppRuntime {
-  const apiClient = createApiClient()
+  const queryClient = createQueryClient()
+  const apiClient = createApiClient(() => transitionToAnonymousSession(queryClient))
   const antiforgery = new HttpAntiforgeryClient(apiClient)
   const authentication = new HttpAuthenticationGateway(apiClient, antiforgery)
   const projects = new HttpProjectsGateway(apiClient, antiforgery)
   const session = new SessionService(authentication)
 
   return {
-    queryClient: createQueryClient(),
+    queryClient,
     projects,
     session,
   }

@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { errorMessage } from '@/shared/errors/appError'
-import { removeAuthenticatedQueries } from '@/shared/query/authenticatedQueries'
-import { sessionKeys } from '../current-session/sessionQueries'
+import { transitionToAnonymousSession } from '../current-session/sessionCache'
 import { useSessionService } from '../sessionContext'
 
 export function useSignOut() {
@@ -10,8 +9,7 @@ export function useSignOut() {
   const signOut = useMutation({
     mutationFn: () => service.signOut(),
     onSuccess: () => {
-      removeAuthenticatedQueries(queryClient)
-      queryClient.setQueryData(sessionKeys.current(), null)
+      transitionToAnonymousSession(queryClient)
     },
   })
 
