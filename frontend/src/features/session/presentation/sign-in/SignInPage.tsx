@@ -1,4 +1,4 @@
-import { useSignIn } from './useSession'
+import { useSignIn } from './useSignIn'
 
 export function SignInPage() {
   const { error, isSigningIn, signIn } = useSignIn()

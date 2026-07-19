@@ -1,8 +1,8 @@
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { useEffect, type PropsWithChildren } from 'react'
 import { ProjectsGatewayContext } from '@/features/projects/presentation/projectsGatewayContext'
+import { useSession } from '@/features/session/presentation/current-session/useSession'
 import { SessionServiceContext } from '@/features/session/presentation/sessionContext'
-import { useSession } from '@/features/session/presentation/useSession'
 import { removeAuthenticatedQueries } from '@/shared/query/authenticatedQueries'
 import type { AppRuntime } from './composition'
 

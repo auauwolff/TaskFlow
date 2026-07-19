@@ -4,8 +4,8 @@ import {
   authenticatedQueryMeta,
   removeAuthenticatedQueries,
 } from '@/shared/query/authenticatedQueries'
-import type { SessionUseCases } from '../application/sessionService'
-import { userId, type User } from '../domain/user'
+import type { SessionUseCases } from '../../application/sessionService'
+import { userId, type User } from '../../domain/user'
 import { currentSessionOptions, sessionKeys } from './sessionQueries'
 
 const currentUser: User = {

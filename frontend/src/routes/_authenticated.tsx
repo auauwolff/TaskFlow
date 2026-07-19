@@ -1,7 +1,8 @@
 /* oxlint-disable react/only-export-components -- Route modules export TanStack's route contract. */
 import { createFileRoute, Outlet } from '@tanstack/react-router'
-import { SignInPage } from '@/features/session/presentation/SignInPage'
-import { useSession, useSignOut } from '@/features/session/presentation/useSession'
+import { useSession } from '@/features/session/presentation/current-session/useSession'
+import { SignInPage } from '@/features/session/presentation/sign-in/SignInPage'
+import { useSignOut } from '@/features/session/presentation/sign-out/useSignOut'
 
 export const Route = createFileRoute('/_authenticated')({
   component: AuthenticatedLayout,

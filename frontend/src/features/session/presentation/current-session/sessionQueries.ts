@@ -1,5 +1,5 @@
 import { queryOptions } from '@tanstack/react-query'
-import type { SessionUseCases } from '../application/sessionService'
+import type { SessionUseCases } from '../../application/sessionService'
 
 export const sessionKeys = {
   all: ['session'] as const,
