@@ -9,9 +9,9 @@ state ownership rather than feature volume.
 
 ## Status
 
-The backend, OIDC authentication, and authenticated project vertical slice are implemented. Task UI,
-browser-level tests, and production containers remain on the roadmap. See [`PROGRESS.md`](PROGRESS.md)
-for the learning journal and detailed implementation history.
+The backend, OIDC authentication, authenticated project vertical slice, and isolated browser journeys
+are implemented. Task UI and production containers remain on the roadmap. See
+[`PROGRESS.md`](PROGRESS.md) for the learning journal and detailed implementation history.
 
 ## Architecture
 
@@ -79,7 +79,7 @@ application dependency.
 - OpenID Connect, secure cookie BFF, Keycloak for local development
 - FluentValidation, Problem Details, Serilog, OpenAPI/Swagger
 - React 19, TypeScript, Vite, TanStack Router and Query, React Hook Form
-- xUnit, NSubstitute, FluentAssertions, Vitest, Dependency Cruiser, Oxlint
+- xUnit, NSubstitute, FluentAssertions, Vitest, Playwright, Dependency Cruiser, Oxlint
 
 ## Repository
 
@@ -145,6 +145,13 @@ pnpm --dir frontend test
 pnpm --dir frontend build
 ```
 
+The browser suite uses isolated, disposable PostgreSQL and Keycloak containers:
+
+```bash
+pnpm --dir frontend exec playwright install chromium
+pnpm --dir frontend test:e2e
+```
+
 Run the API before regenerating the TypeScript transport contract:
 
 ```bash
@@ -167,7 +174,6 @@ investigation but become noisy, so they are supplemental rather than the primary
 
 ## Next Steps
 
-- Add Playwright journeys for authentication, project creation, persistence, and logout isolation.
-- Add deterministic test-data reset before running full-stack tests in CI.
+- Run the Playwright journeys in CI with browser and Docker support.
 - Implement the task vertical slice after correcting task enum representation in generated OpenAPI.
 - Add API/frontend containers and a production reverse proxy.

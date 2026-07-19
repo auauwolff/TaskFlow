@@ -35,3 +35,20 @@ pnpm generate:api
 
 Route files live in `src/routes`. The TanStack Router Vite plugin generates
 `src/routeTree.gen.ts`; do not edit that file manually.
+
+## Browser tests
+
+Playwright exercises the real browser, API, PostgreSQL database, and Keycloak login flow. Install its
+Chromium build once, then run the suite:
+
+```bash
+pnpm exec playwright install chromium
+pnpm test:e2e
+```
+
+`test:e2e` starts disposable PostgreSQL and Keycloak containers on ports `55432` and `18080`, applies
+migrations, starts the API on `15131` and Vite on `15173`, and removes the containers afterward. It
+does not use or delete the normal development volumes and can run beside the development stack.
+
+Use `pnpm test:e2e:ui` for Playwright UI mode. Browser tests live in `e2e/`; they verify public user
+journeys and must not import application implementation code.

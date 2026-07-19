@@ -10,6 +10,8 @@
     "lint": "oxlint",
     "architecture": "depcruise src --config .dependency-cruiser.cjs",
     "test": "vitest run",
+    "test:e2e": "bash e2e/run.sh",
+    "test:e2e:ui": "bash e2e/run.sh --ui",
     "generate:api": "openapi-typescript http://localhost:5131/openapi/v1.json -o src/shared/api/schema.d.ts",
     "preview": "vite preview"
   },
@@ -22,6 +24,7 @@
     "react-hook-form": "^7.82.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tanstack/router-plugin": "^1.168.22",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",

@@ -1,0 +1,47 @@
+{
+  "realm": "taskflow",
+  "enabled": true,
+  "displayName": "TaskFlow",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "clients": [
+    {
+      "clientId": "taskflow-bff",
+      "name": "TaskFlow BFF",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "taskflow_dev_client_secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "publicClient": false,
+      "redirectUris": [
+        "http://localhost:15173/api/auth/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:15173"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:15173/*"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "ada",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Ada",
+      "lastName": "Lovelace",
+      "email": "ada@example.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "taskflow",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

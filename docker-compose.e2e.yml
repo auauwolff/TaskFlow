@@ -1,0 +1,22 @@
+services:
+  postgres-e2e:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: taskflow_e2e
+      POSTGRES_PASSWORD: taskflow_e2e_pwd
+      POSTGRES_DB: taskflow_e2e
+    ports:
+      - "55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+
+  keycloak-e2e:
+    image: quay.io/keycloak/keycloak:26.3.3
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: taskflow_e2e_admin
+    ports:
+      - "18080:8080"
+    volumes:
+      - ./infra/keycloak/taskflow-e2e-realm.json:/opt/keycloak/data/import/taskflow-realm.json:ro
