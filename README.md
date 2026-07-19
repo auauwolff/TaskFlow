@@ -1,112 +1,173 @@
 # TaskFlow
 
-A small task/project manager built **from scratch** as a hands-on way to learn
-backend C# / .NET the _clean_ way: Clean Architecture, SOLID, dependency
-injection, interfaces, and the common design patterns — each one introduced
-where it actually earns its keep, not in the abstract.
+TaskFlow is a small project and task manager built to explore full-stack Clean Architecture in a
+codebase that is large enough to be realistic and small enough to understand end to end.
 
-The app itself is deliberately simple (`User` → `Project` → `TaskItem`). The
-point is the _architecture_, not the features.
+The domain is intentionally simple: `User -> Project -> TaskItem`. The focus is on explicit
+boundaries, dependency inversion, testable use cases, provider-neutral authentication, and clear
+state ownership rather than feature volume.
+
+## Status
+
+The backend, OIDC authentication, and authenticated project vertical slice are implemented. Task UI,
+browser-level tests, and production containers remain on the roadmap. See [`PROGRESS.md`](PROGRESS.md)
+for the learning journal and detailed implementation history.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Browser[React application] -->|same-origin /api| API[ASP.NET Core API]
+    API --> Application[Application use cases]
+    API --> Infrastructure[Infrastructure adapters]
+    Infrastructure --> Application
+    Application --> Domain[Domain model]
+    Infrastructure --> Domain
+    Infrastructure --> PostgreSQL[(PostgreSQL)]
+    API <-->|OIDC authorization code + PKCE| OIDC[OIDC provider<br/>Keycloak locally]
+```
+
+### Backend
+
+The backend follows the Clean Architecture dependency rule: dependencies point inward and inner
+layers know nothing about delivery or persistence details.
+
+| Project | Depends on | Responsibility |
+| --- | --- | --- |
+| `TaskFlow.Domain` | Nothing | Entities, value objects, invariants, repository contracts |
+| `TaskFlow.Application` | Domain | Use cases, ports, DTOs, validation |
+| `TaskFlow.Infrastructure` | Application, Domain | EF Core, PostgreSQL, repository adapters, migrations |
+| `TaskFlow.Api` | Application, Infrastructure | Controllers, authentication, middleware, composition root |
+
+Project references enforce these boundaries at compile time. ASP.NET is the composition root and
+wires the complete object graph through dependency injection.
+
+### Frontend
+
+The frontend uses feature-first Hexagonal Architecture. A feature creates only the layers it needs:
+
+```mermaid
+flowchart LR
+    Composition[app/composition] --> Presentation[presentation<br/>React, Router, Query]
+    Composition --> Adapters[adapters<br/>HTTP, browser APIs]
+    Presentation --> Application[application<br/>use cases and ports]
+    Adapters --> Application
+    Application --> Domain[domain<br/>models and policies]
+```
+
+- TanStack Query owns API and session state.
+- TanStack Router owns shareable navigation state.
+- React Hook Form owns form values and validation.
+- Local React state owns transient interaction state.
+- Focused Context providers expose stable injected services, not changing server data.
+- HTTP adapters contain generated transport types and map them into application/domain models.
+- Dependency Cruiser enforces layer direction and rejects circular imports.
+
+See [`frontend/ARCHITECTURE.md`](frontend/ARCHITECTURE.md) for the complete dependency and state
+ownership rules.
+
+### Authentication
+
+The browser talks only to stable TaskFlow endpoints. ASP.NET owns the OpenID Connect flow, tokens,
+antiforgery validation, and the secure `HttpOnly` session cookie. React has no identity-provider SDK
+and never receives access tokens. Keycloak is therefore a replaceable local adapter rather than an
+application dependency.
 
 ## Stack
 
-- **.NET 10** (LTS) + **ASP.NET Core Web API** (controllers)
-- **EF Core** + **Npgsql** + **PostgreSQL** (in Docker)
-- **FluentValidation**, **Serilog**, **OpenAPI/Swagger**
-- **OpenID Connect** + ASP.NET secure cookie BFF authentication
-- **xUnit** + **NSubstitute** + **FluentAssertions**
-- **React 19** + **Vite** + **TypeScript** + **TanStack Router/Query** + **React Hook Form** (pnpm)
+- .NET 10, ASP.NET Core controllers, EF Core, Npgsql, PostgreSQL
+- OpenID Connect, secure cookie BFF, Keycloak for local development
+- FluentValidation, Problem Details, Serilog, OpenAPI/Swagger
+- React 19, TypeScript, Vite, TanStack Router and Query, React Hook Form
+- xUnit, NSubstitute, FluentAssertions, Vitest, Dependency Cruiser, Oxlint
 
-## Architecture — the dependency rule
+## Repository
 
-Dependencies only ever point **inward**. The inner layers know nothing about the
-outer ones.
-
-```
-        ┌─────────────────────────────────────────┐
-        │  Api  (controllers, DI composition root) │   ← references everything
-        │   ┌─────────────────────────────────┐    │
-        │   │ Infrastructure (EF Core, repos) │    │   ← implements Application/Domain interfaces
-        │   │   ┌─────────────────────────┐   │    │
-        │   │   │ Application (use cases) │   │    │   ← orchestrates the domain
-        │   │   │   ┌─────────────────┐   │   │    │
-        │   │   │   │ Domain (core)   │   │   │    │   ← entities + rules, ZERO dependencies
-        │   │   │   └─────────────────┘   │   │    │
-        │   │   └─────────────────────────┘   │    │
-        │   └─────────────────────────────────┘    │
-        └─────────────────────────────────────────┘
+```text
+TaskFlow/
+|-- backend/             .NET solution, production projects, and tests
+|-- frontend/            React/Vite application and architecture rules
+|-- infra/keycloak/      Local OIDC realm configuration
+|-- docker-compose.yml   PostgreSQL and Keycloak development services
+|-- PROGRESS.md          Learning journal and roadmap
+`-- README.md
 ```
 
-| Project                   | Depends on                  | Responsibility                                                      |
-| ------------------------- | --------------------------- | ------------------------------------------------------------------- |
-| `TaskFlow.Domain`         | _(nothing)_                 | Entities, value objects, domain rules, repository **interfaces**.   |
-| `TaskFlow.Application`    | Domain                      | Use-case services, DTOs, validators, infrastructure **interfaces**. |
-| `TaskFlow.Infrastructure` | Application, Domain         | EF Core `DbContext`, repository **implementations**, migrations.    |
-| `TaskFlow.Api`            | Application, Infrastructure | Controllers, DI wiring (composition root), middleware.              |
+## Run Locally
 
-The references are enforced by the compiler: if `Domain` ever tried to reference
-`Infrastructure`, the build would fail. The constraint _is_ the lesson.
+Prerequisites: .NET 10 SDK, the `dotnet-ef` tool, Docker Compose, and pnpm 10.
 
-## Getting started
+From the repository root:
 
 ```bash
-# 1. Build the backend
+# Build the backend and start local infrastructure
 dotnet build backend/TaskFlow.slnx
-
-# 2. Start Postgres and the local OIDC provider
 docker compose up -d postgres keycloak
 
-# 3. Apply migrations
+# Apply the database migration and run the API
 dotnet ef database update --project backend/src/TaskFlow.Infrastructure
-
-# 4. Run the API
 dotnet run --project backend/src/TaskFlow.Api
+```
 
-# 5. Run the backend tests
-dotnet test backend/TaskFlow.slnx
+In another terminal:
 
-# 6. Install and run the frontend (in another terminal)
+```bash
 pnpm --dir frontend install
 pnpm --dir frontend dev
 ```
 
-Open `http://localhost:5173` and use the imported development account:
+Open `http://localhost:5173` and sign in with the local development user:
 
 ```text
 Username: ada
 Password: taskflow
 ```
 
-Keycloak is only the local development OIDC adapter. TaskFlow depends on standard OIDC claims and
-ASP.NET authentication abstractions, so another OIDC provider is selected through
-`Authentication:Oidc` configuration rather than frontend or Application-layer changes. Never use
-the committed development client secret or demo credentials outside local development.
+| Service | URL |
+| --- | --- |
+| Frontend | `http://localhost:5173` |
+| API | `http://localhost:5131` |
+| Swagger | `http://localhost:5131/swagger` |
+| OpenAPI | `http://localhost:5131/openapi/v1.json` |
+| Keycloak | `http://localhost:8080` |
 
-The required provider settings are `Authority`, `ClientId`, `ClientSecret`, and `PublicOrigin`.
-Keycloak imports the development realm only when it does not already exist; remove the
-`keycloak_data` volume when intentionally re-importing changed realm configuration.
+The committed credentials and OIDC client secret are for local development only.
 
-## Repository layout
+## Quality Gates
 
-```text
-TaskFlow/
-├── backend/     # .NET solution, production projects, and tests
-├── frontend/    # React/Vite client
-└── docker-compose.yml
+```bash
+dotnet build backend/TaskFlow.slnx --warnaserror
+dotnet test backend/TaskFlow.slnx
+
+pnpm --dir frontend lint
+pnpm --dir frontend architecture
+pnpm --dir frontend test
+pnpm --dir frontend build
 ```
 
-The frontend applies feature-first Hexagonal Architecture. See
-[`frontend/ARCHITECTURE.md`](frontend/ARCHITECTURE.md) for its dependency rule, state ownership,
-transport boundary, and replaceability decisions.
+Run the API before regenerating the TypeScript transport contract:
 
-## Learning roadmap
+```bash
+pnpm --dir frontend generate:api
+```
 
-- **Phase 0** ✅ Toolchain + solution skeleton (the dependency rule).
-- **Phase 1** Domain layer — rich entities, value objects, repository interfaces.
-- **Phase 2** Application layer — use-case services, DTOs, validation, factory.
-- **Phase 3** Infrastructure — EF Core + Postgres, repositories, migrations.
-- **Phase 4** ✅ Api — thin controllers, DI composition root, ProblemDetails, Serilog, Swagger.
-- **Phase 5** ✅ Tests — pure Domain tests and Application tests with substituted ports.
-- **Phase 6** 🚧 React + TypeScript client, full-stack `docker compose`.
+## Architecture Graphs
 
-opencode -s ses_08c0511e5ffee3HP24O2WSWcck
+The Mermaid diagrams above are hand-maintained conceptual views and render directly on GitHub.
+Dependency Cruiser provides implementation-level validation and can also generate a frontend graph:
+
+```bash
+cd frontend
+pnpm exec depcruise src --config .dependency-cruiser.cjs \
+  --include-only '^src' --output-type mermaid
+```
+
+Conceptual diagrams should remain small and stable. Generated file-level graphs are useful for local
+investigation but become noisy, so they are supplemental rather than the primary documentation.
+
+## Next Steps
+
+- Add Playwright journeys for authentication, project creation, persistence, and logout isolation.
+- Add deterministic test-data reset before running full-stack tests in CI.
+- Implement the task vertical slice after correcting task enum representation in generated OpenAPI.
+- Add API/frontend containers and a production reverse proxy.

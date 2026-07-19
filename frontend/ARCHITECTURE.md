@@ -61,6 +61,21 @@ same cached data rather than issuing independent requests. React Context distrib
 services, not frequently changing feature data. Crossing into an anonymous session clears
 authenticated Query data while preserving the session query.
 
+When state must be shared across components, choose its owner by meaning rather than reach:
+
+1. Keep API-derived data in Query and let every consumer subscribe through a feature hook.
+2. Put selected resources, filters, sorting, and other shareable state in Router path/search params.
+3. Keep form state in React Hook Form; use `FormProvider` only when one form spans a deep subtree.
+4. Lift transient interaction state to the nearest common component that needs it.
+5. Use a focused Context plus reducer for genuinely cross-tree client concerns such as theme or a
+   notification queue. Place the provider at the narrowest route or application boundary.
+6. Add a dedicated client-state library only after real, frequently changing, interconnected state
+   makes focused React ownership unwieldy. It must not duplicate Query or Router state.
+
+New application complexity should come from real capabilities. Project selection, task filters, and
+task workflows naturally exercise URL, server, form, and local state without introducing a global
+store or artificial examples.
+
 A pathless authenticated route owns session loading, failure, anonymous, and ready rendering. Child
 pages do not receive session props. Shared authenticated chrome reads the cached session at the route
 boundary, and future authenticated routes inherit the same guard.
