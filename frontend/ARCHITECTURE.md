@@ -65,6 +65,14 @@ A pathless authenticated route owns session loading, failure, anonymous, and rea
 pages do not receive session props. Shared authenticated chrome reads the cached session at the route
 boundary, and future authenticated routes inherit the same guard.
 
+## Presentation organization
+
+As a feature grows, presentation code is grouped by UI capability rather than technical file type.
+Components, hooks, Query or mutation definitions, and tests that change together stay together in
+folders such as `project-list` and `create-project`. Feature-wide page composition, cache keys, and
+dependency contexts remain at the presentation root. Avoid broad `components`, `hooks`, `queries`,
+and `mutations` folders that scatter one capability across the tree.
+
 ## Transport boundary
 
 `openapi-typescript` generates `src/shared/api/schema.d.ts` from the running .NET API. Generated
