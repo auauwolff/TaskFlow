@@ -29,6 +29,7 @@ export function networkError(error: unknown): Error {
 
 function errorKind(status: number): AppErrorKind {
   if (status === 400) return 'validation'
+  if (status === 401) return 'unauthorized'
   if (status === 404) return 'not-found'
   if (status === 409) return 'conflict'
   return 'unexpected'

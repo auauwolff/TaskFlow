@@ -1,5 +1,6 @@
 export type AppErrorKind =
   | 'validation'
+  | 'unauthorized'
   | 'not-found'
   | 'conflict'
   | 'network'

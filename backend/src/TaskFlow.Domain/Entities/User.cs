@@ -26,6 +26,8 @@ public sealed class User : Entity
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("User name is required.");
+        if (name.Trim().Length > 200)
+            throw new DomainException("User name cannot exceed 200 characters.");
 
         return new User(Guid.NewGuid(), name.Trim(), email);
     }
@@ -34,6 +36,8 @@ public sealed class User : Entity
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("User name is required.");
+        if (name.Trim().Length > 200)
+            throw new DomainException("User name cannot exceed 200 characters.");
 
         Name = name.Trim();
     }

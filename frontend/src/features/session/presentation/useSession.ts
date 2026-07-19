@@ -1,5 +1,4 @@
 import { errorMessage } from '@/shared/errors/appError'
-import type { CreateUserInput } from '../application/ports'
 import type { User } from '../domain/user'
 import { SessionActorContext } from './sessionContext'
 
@@ -8,8 +7,8 @@ export type SessionViewModel =
   | {
       status: 'anonymous'
       error: string | null
-      isCreating: boolean
-      createUser(input: CreateUserInput): void
+      isSigningIn: boolean
+      signIn(): void
     }
   | { status: 'failed'; message: string; retry(): void }
   | { status: 'ready'; user: User; error: string | null; signOut(): void }
@@ -18,12 +17,12 @@ export function useSession(): SessionViewModel {
   const actor = SessionActorContext.useActorRef()
   const snapshot = SessionActorContext.useSelector((value) => value)
 
-  if (snapshot.matches('anonymous') || snapshot.matches('creating')) {
+  if (snapshot.matches('anonymous') || snapshot.matches('signingIn')) {
     return {
       status: 'anonymous',
       error: snapshot.context.error === null ? null : errorMessage(snapshot.context.error),
-      isCreating: snapshot.matches('creating'),
-      createUser: (input) => actor.send({ type: 'session.create', input }),
+      isSigningIn: snapshot.matches('signingIn'),
+      signIn: () => actor.send({ type: 'session.sign-in', returnUrl: '/' }),
     }
   }
 
@@ -35,7 +34,10 @@ export function useSession(): SessionViewModel {
     }
   }
 
-  if (snapshot.matches('ready') && snapshot.context.user !== null) {
+  if (
+    (snapshot.matches('ready') || snapshot.matches('signingOut')) &&
+    snapshot.context.user !== null
+  ) {
     return {
       status: 'ready',
       user: snapshot.context.user,

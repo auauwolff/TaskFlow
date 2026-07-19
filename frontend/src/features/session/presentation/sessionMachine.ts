@@ -1,27 +1,25 @@
 import { assign, fromPromise, setup } from 'xstate'
-import type { CreateUserInput } from '../application/ports'
 import type { SessionService } from '../application/sessionService'
 import type { User } from '../domain/user'
 
 interface SessionContext {
   user: User | null
-  pendingUser: CreateUserInput | null
   error: unknown
 }
 
 type SessionEvent =
-  | { type: 'session.create'; input: CreateUserInput }
+  | { type: 'session.sign-in'; returnUrl: string }
   | { type: 'session.retry' }
   | { type: 'session.sign-out' }
 
 const missingRestore = fromPromise<User | null, void>(() =>
   Promise.reject(new Error('The restore-session actor was not provided.')),
 )
-const missingCreate = fromPromise<User, CreateUserInput>(() =>
-  Promise.reject(new Error('The create-user actor was not provided.')),
+const missingSignIn = fromPromise<void, string>(() =>
+  Promise.reject(new Error('The sign-in actor was not provided.')),
 )
-const missingClear = fromPromise<void, void>(() =>
-  Promise.reject(new Error('The clear-session actor was not provided.')),
+const missingSignOut = fromPromise<void, void>(() =>
+  Promise.reject(new Error('The sign-out actor was not provided.')),
 )
 
 export const sessionMachine = setup({
@@ -31,15 +29,14 @@ export const sessionMachine = setup({
   },
   actors: {
     restoreSession: missingRestore,
-    createUser: missingCreate,
-    clearSession: missingClear,
+    signIn: missingSignIn,
+    signOut: missingSignOut,
   },
 }).createMachine({
   id: 'session',
   initial: 'restoring',
   context: {
     user: null,
-    pendingUser: null,
     error: null,
   },
   states: {
@@ -65,52 +62,39 @@ export const sessionMachine = setup({
     },
     anonymous: {
       on: {
-        'session.create': {
-          target: 'creating',
-          actions: assign({
-            pendingUser: ({ event }) => event.input,
-            error: null,
-          }),
+        'session.sign-in': {
+          target: 'signingIn',
+          actions: assign({ error: null }),
         },
       },
     },
-    creating: {
+    signingIn: {
       invoke: {
-        src: 'createUser',
-        input: ({ context }) => {
-          if (context.pendingUser === null)
-            throw new Error('A pending user is required while creating a session.')
+        src: 'signIn',
+        input: ({ event }) => {
+          if (event.type !== 'session.sign-in')
+            throw new Error('A return URL is required while signing in.')
 
-          return context.pendingUser
+          return event.returnUrl
         },
-        onDone: {
-          target: 'ready',
-          actions: assign({
-            user: ({ event }) => event.output,
-            pendingUser: null,
-            error: null,
-          }),
-        },
+        onDone: { target: 'anonymous' },
         onError: {
           target: 'anonymous',
-          actions: assign({
-            pendingUser: null,
-            error: ({ event }) => event.error,
-          }),
+          actions: assign({ error: ({ event }) => event.error }),
         },
       },
     },
     ready: {
       on: {
         'session.sign-out': {
-          target: 'clearing',
+          target: 'signingOut',
           actions: assign({ error: null }),
         },
       },
     },
-    clearing: {
+    signingOut: {
       invoke: {
-        src: 'clearSession',
+        src: 'signOut',
         onDone: {
           target: 'anonymous',
           actions: assign({ user: null, error: null }),
@@ -136,8 +120,8 @@ export function provideSessionMachine(service: SessionService) {
   return sessionMachine.provide({
     actors: {
       restoreSession: fromPromise(({ signal }) => service.restore(signal)),
-      createUser: fromPromise(({ input, signal }) => service.create(input, signal)),
-      clearSession: fromPromise(() => service.clear()),
+      signIn: fromPromise(({ input }) => service.signIn(input)),
+      signOut: fromPromise(({ signal }) => service.signOut(signal)),
     },
   })
 }

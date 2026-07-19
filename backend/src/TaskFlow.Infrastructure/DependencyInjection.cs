@@ -29,6 +29,7 @@ public static class DependencyInjection
 
         // Bind each Domain port to its EF adapter. The inner layers only ever see the interfaces.
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IExternalIdentityRepository, ExternalIdentityRepository>();
         services.AddScoped<IProjectRepository, ProjectRepository>();
         services.AddScoped<ITaskItemRepository, TaskItemRepository>();
 

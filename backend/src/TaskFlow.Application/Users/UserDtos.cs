@@ -9,5 +9,10 @@ namespace TaskFlow.Application.Users;
 /// </summary>
 public sealed record UserDto(Guid Id, string Name, string Email);
 
-/// <summary>What a client sends to create a user. Validated by <c>CreateUserRequestValidator</c>.</summary>
-public sealed record CreateUserRequest(string Name, string Email);
+/// <summary>Provider-neutral profile supplied only by the trusted OIDC authentication adapter.</summary>
+public sealed record ExternalUserProfile(
+    string Issuer,
+    string Subject,
+    string Name,
+    string Email,
+    bool EmailVerified);

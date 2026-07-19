@@ -7,7 +7,6 @@ public sealed class CreateProjectRequestValidator : AbstractValidator<CreateProj
     public CreateProjectRequestValidator()
     {
         RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
-        RuleFor(x => x.OwnerId).NotEmpty().WithMessage("OwnerId is required.");
         RuleFor(x => x.Description).MaximumLength(2000);
     }
 }

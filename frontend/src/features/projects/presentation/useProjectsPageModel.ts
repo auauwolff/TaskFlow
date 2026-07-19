@@ -69,7 +69,7 @@ export function useProjectsPageModel(ownerId: UserId): ProjectsPageModel {
     createError: createProject.error === null ? null : errorMessage(createProject.error),
     create: async (input) => {
       try {
-        await createProject.mutateAsync({ ...input, ownerId })
+        await createProject.mutateAsync(input)
         return true
       } catch {
         return false

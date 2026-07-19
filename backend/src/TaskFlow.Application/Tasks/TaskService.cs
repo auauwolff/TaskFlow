@@ -11,6 +11,7 @@ public sealed class TaskService : ITaskService
     private readonly ITaskItemRepository _tasks;
     private readonly IProjectRepository _projects;
     private readonly IUserRepository _users;
+    private readonly ICurrentUser _currentUser;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IValidator<CreateTaskRequest> _createValidator;
     private readonly IValidator<AssignTaskRequest> _assignValidator;
@@ -20,6 +21,7 @@ public sealed class TaskService : ITaskService
         ITaskItemRepository tasks,
         IProjectRepository projects,
         IUserRepository users,
+        ICurrentUser currentUser,
         IUnitOfWork unitOfWork,
         IValidator<CreateTaskRequest> createValidator,
         IValidator<AssignTaskRequest> assignValidator,
@@ -28,6 +30,7 @@ public sealed class TaskService : ITaskService
         _tasks = tasks;
         _projects = projects;
         _users = users;
+        _currentUser = currentUser;
         _unitOfWork = unitOfWork;
         _createValidator = createValidator;
         _assignValidator = assignValidator;
@@ -38,8 +41,7 @@ public sealed class TaskService : ITaskService
     {
         await _createValidator.ValidateAndThrowAsync(request, cancellationToken);
 
-        if (await _projects.GetByIdAsync(request.ProjectId, cancellationToken) is null)
-            throw new NotFoundException(nameof(Project), request.ProjectId);
+        await GetOwnedProjectAsync(request.ProjectId, cancellationToken);
 
         var task = TaskItem.Create(
             request.ProjectId,
@@ -56,22 +58,21 @@ public sealed class TaskService : ITaskService
 
     public async Task<TaskItemDto> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var task = await _tasks.GetByIdAsync(id, cancellationToken)
-                   ?? throw new NotFoundException(nameof(TaskItem), id);
+        var task = await GetOwnedTaskAsync(id, cancellationToken);
 
         return task.ToDto();
     }
 
     public async Task<IReadOnlyList<TaskItemDto>> ListByProjectAsync(Guid projectId, CancellationToken cancellationToken = default)
     {
+        await GetOwnedProjectAsync(projectId, cancellationToken);
         var tasks = await _tasks.ListByProjectAsync(projectId, cancellationToken);
         return tasks.Select(t => t.ToDto()).ToList();
     }
 
     public async Task<TaskItemDto> CompleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var task = await _tasks.GetByIdAsync(id, cancellationToken)
-                   ?? throw new NotFoundException(nameof(TaskItem), id);
+        var task = await GetOwnedTaskAsync(id, cancellationToken);
 
         // The RULE lives in the entity. The service only orchestrates: load -> act -> save.
         // If the task is already Done, TaskItem.Complete is a no-op (idempotent).
@@ -85,8 +86,7 @@ public sealed class TaskService : ITaskService
     {
         await _assignValidator.ValidateAndThrowAsync(request, cancellationToken);
 
-        var task = await _tasks.GetByIdAsync(id, cancellationToken)
-                   ?? throw new NotFoundException(nameof(TaskItem), id);
+        var task = await GetOwnedTaskAsync(id, cancellationToken);
 
         if (await _users.GetByIdAsync(request.AssigneeId, cancellationToken) is null)
             throw new NotFoundException(nameof(User), request.AssigneeId);
@@ -95,5 +95,27 @@ public sealed class TaskService : ITaskService
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return task.ToDto();
+    }
+
+    private async Task<Project> GetOwnedProjectAsync(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var project = await _projects.GetByIdAsync(id, cancellationToken);
+        if (project is null || project.OwnerId != _currentUser.UserId)
+            throw new NotFoundException(nameof(Project), id);
+
+        return project;
+    }
+
+    private async Task<TaskItem> GetOwnedTaskAsync(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var task = await _tasks.GetByIdAsync(id, cancellationToken)
+                   ?? throw new NotFoundException(nameof(TaskItem), id);
+
+        await GetOwnedProjectAsync(task.ProjectId, cancellationToken);
+        return task;
     }
 }

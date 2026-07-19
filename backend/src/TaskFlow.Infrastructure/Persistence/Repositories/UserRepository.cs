@@ -22,9 +22,6 @@ internal sealed class UserRepository : IUserRepository
     public Task<User?> GetByEmailAsync(Email email, CancellationToken cancellationToken = default) =>
         _db.Users.FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
 
-    public Task<bool> ExistsByEmailAsync(Email email, CancellationToken cancellationToken = default) =>
-        _db.Users.AnyAsync(u => u.Email == email, cancellationToken);
-
     // AddAsync only STAGES the insert in the change-tracker; nothing hits Postgres until the
     // unit of work calls SaveChangesAsync. (That gap is the whole point of the Unit of Work pattern.)
     public async Task AddAsync(User user, CancellationToken cancellationToken = default) =>

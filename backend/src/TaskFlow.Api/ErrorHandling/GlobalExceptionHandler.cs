@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using TaskFlow.Application.Common.Exceptions;
@@ -53,6 +54,10 @@ public sealed class GlobalExceptionHandler(
             StatusCodes.Status409Conflict,
             "A resource conflict occurred",
             exception.Message),
+        AntiforgeryValidationException => CreateProblem(
+            StatusCodes.Status400BadRequest,
+            "Antiforgery validation failed",
+            "The request could not be verified."),
         _ => CreateProblem(
             StatusCodes.Status500InternalServerError,
             "An unexpected error occurred",

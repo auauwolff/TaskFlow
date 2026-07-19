@@ -7,4 +7,4 @@ public sealed record ProjectDto(
     Guid OwnerId,
     DateTimeOffset CreatedAt);
 
-public sealed record CreateProjectRequest(string Name, Guid OwnerId, string? Description);
+public sealed record CreateProjectRequest(string Name, string? Description);

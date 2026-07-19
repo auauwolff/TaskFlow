@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TaskFlow.Application.Projects;
 
 namespace TaskFlow.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/projects")]
 public sealed class ProjectsController(IProjectService projects) : ControllerBase
 {
@@ -27,8 +29,7 @@ public sealed class ProjectsController(IProjectService projects) : ControllerBas
 
     [HttpGet]
     [ProducesResponseType<IReadOnlyList<ProjectDto>>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<ProjectDto>>> ListByOwner(
-        [FromQuery] Guid ownerId,
+    public async Task<ActionResult<IReadOnlyList<ProjectDto>>> List(
         CancellationToken cancellationToken) =>
-        Ok(await projects.ListByOwnerAsync(ownerId, cancellationToken));
+        Ok(await projects.ListAsync(cancellationToken));
 }

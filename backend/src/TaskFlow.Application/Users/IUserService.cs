@@ -7,6 +7,8 @@ namespace TaskFlow.Application.Users;
 /// </summary>
 public interface IUserService
 {
-    Task<UserDto> CreateAsync(CreateUserRequest request, CancellationToken cancellationToken = default);
+    Task<UserDto> FindOrProvisionAsync(
+        ExternalUserProfile profile,
+        CancellationToken cancellationToken = default);
     Task<UserDto> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 }

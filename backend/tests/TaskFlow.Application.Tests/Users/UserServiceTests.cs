@@ -1,5 +1,4 @@
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 using TaskFlow.Application.Common.Exceptions;
 using TaskFlow.Application.Common.Interfaces;
@@ -13,58 +12,119 @@ namespace TaskFlow.Application.Tests.Users;
 public sealed class UserServiceTests
 {
     private readonly IUserRepository _users = Substitute.For<IUserRepository>();
+    private readonly IExternalIdentityRepository _externalIdentities =
+        Substitute.For<IExternalIdentityRepository>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly UserService _service;
 
     public UserServiceTests()
     {
-        _service = new UserService(_users, _unitOfWork, new CreateUserRequestValidator());
+        _service = new UserService(_users, _externalIdentities, _unitOfWork);
     }
 
     [Fact]
-    public async Task CreateAsync_ValidRequest_AddsUserSavesAndReturnsDto()
+    public async Task FindOrProvisionAsync_NewIdentity_CreatesInternalUserAndLink()
     {
-        var request = new CreateUserRequest("  Ada Lovelace  ", "ADA@Example.COM");
+        var profile = new ExternalUserProfile(
+            "https://identity.example",
+            "subject-123",
+            "  Ada Lovelace  ",
+            "ADA@Example.COM",
+            true);
         User? addedUser = null;
-        _users.ExistsByEmailAsync(Arg.Any<Email>(), Arg.Any<CancellationToken>()).Returns(false);
+        ExternalIdentity? addedIdentity = null;
         _users.AddAsync(Arg.Do<User>(user => addedUser = user), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
+        _externalIdentities.AddAsync(
+                Arg.Do<ExternalIdentity>(identity => addedIdentity = identity),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
 
-        var result = await _service.CreateAsync(request);
+        var result = await _service.FindOrProvisionAsync(profile);
 
         addedUser.Should().NotBeNull();
-        addedUser!.Name.Should().Be("Ada Lovelace");
-        addedUser.Email.Value.Should().Be("ada@example.com");
-        result.Should().Be(new UserDto(addedUser.Id, addedUser.Name, addedUser.Email.Value));
-        await _users.Received(1).AddAsync(addedUser, Arg.Any<CancellationToken>());
+        addedIdentity.Should().NotBeNull();
+        addedIdentity!.UserId.Should().Be(addedUser!.Id);
+        addedIdentity.Issuer.Should().Be(profile.Issuer);
+        addedIdentity.Subject.Should().Be(profile.Subject);
+        result.Should().Be(new UserDto(addedUser.Id, "Ada Lovelace", "ada@example.com"));
         await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task CreateAsync_InvalidRequest_DoesNotUsePersistence()
+    public async Task FindOrProvisionAsync_KnownIdentity_ReturnsSameUserAndRefreshesProfile()
     {
-        var act = () => _service.CreateAsync(new CreateUserRequest("", "not-an-email"));
+        var user = User.Create("Old name", Email.Create("old@example.com"));
+        var identity = ExternalIdentity.Create(
+            user.Id,
+            "https://identity.example",
+            "subject-123");
+        var profile = new ExternalUserProfile(
+            identity.Issuer,
+            identity.Subject,
+            "Ada Lovelace",
+            "ada@example.com",
+            true);
+        _externalIdentities.GetAsync(identity.Issuer, identity.Subject, Arg.Any<CancellationToken>())
+            .Returns(identity);
+        _users.GetByIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
 
-        await act.Should().ThrowAsync<ValidationException>();
-        await _users.DidNotReceiveWithAnyArgs().ExistsByEmailAsync(default!, default);
+        var result = await _service.FindOrProvisionAsync(profile);
+
+        result.Id.Should().Be(user.Id);
+        result.Name.Should().Be(profile.Name);
+        result.Email.Should().Be(profile.Email);
+        await _users.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+        await _externalIdentities.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+        await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task FindOrProvisionAsync_UnlinkedDuplicateEmail_ThrowsConflict()
+    {
+        var existingUser = User.Create("Ada", Email.Create("ada@example.com"));
+        _users.GetByEmailAsync(
+                Arg.Is<Email>(email => email != null && email.Value == "ada@example.com"),
+                Arg.Any<CancellationToken>())
+            .Returns(existingUser);
+
+        var act = () => _service.FindOrProvisionAsync(new ExternalUserProfile(
+            "https://identity.example",
+            "new-subject",
+            "Ada",
+            "ada@example.com",
+            false));
+
+        await act.Should().ThrowAsync<ConflictException>()
+            .WithMessage(
+                "The existing user with email 'ada@example.com' requires a verified provider email before linking.");
         await _users.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
         await _unitOfWork.DidNotReceiveWithAnyArgs().SaveChangesAsync(default);
     }
 
     [Fact]
-    public async Task CreateAsync_DuplicateEmail_ThrowsConflictWithoutSaving()
+    public async Task FindOrProvisionAsync_VerifiedEmailForExistingUser_LinksWithoutReplacingUser()
     {
-        _users.ExistsByEmailAsync(
-                Arg.Is<Email>(email => email != null && email.Value == "ada@example.com"),
+        var existingUser = User.Create("Ada", Email.Create("ada@example.com"));
+        _users.GetByEmailAsync(Arg.Any<Email>(), Arg.Any<CancellationToken>())
+            .Returns(existingUser);
+        ExternalIdentity? addedIdentity = null;
+        _externalIdentities.AddAsync(
+                Arg.Do<ExternalIdentity>(identity => addedIdentity = identity),
                 Arg.Any<CancellationToken>())
-            .Returns(true);
+            .Returns(Task.CompletedTask);
 
-        var act = () => _service.CreateAsync(new CreateUserRequest("Ada", "ADA@example.com"));
+        var result = await _service.FindOrProvisionAsync(new ExternalUserProfile(
+            "https://identity.example",
+            "subject-123",
+            "Ada Lovelace",
+            "ada@example.com",
+            true));
 
-        await act.Should().ThrowAsync<ConflictException>()
-            .WithMessage("A user with email 'ada@example.com' already exists.");
+        result.Id.Should().Be(existingUser.Id);
+        addedIdentity!.UserId.Should().Be(existingUser.Id);
         await _users.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
-        await _unitOfWork.DidNotReceiveWithAnyArgs().SaveChangesAsync(default);
+        await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]

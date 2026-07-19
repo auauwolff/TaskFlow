@@ -1,7 +1,7 @@
 # Local infrastructure for TaskFlow.
-# Currently only Postgres. API and frontend services are the next Phase 6 increment.
+# Postgres and a local OIDC provider. API and frontend containers remain a later increment.
 #
-#   docker compose up -d postgres     # start the database in the background
+#   docker compose up -d postgres keycloak
 #   docker compose ps                 # see what's running
 #   docker compose down               # stop (keeps data in the named volume)
 #   docker compose down -v            # stop AND wipe the data volume
@@ -25,5 +25,19 @@ services:
       timeout: 5s
       retries: 5
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3.3
+    container_name: taskflow-keycloak
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: taskflow_admin
+    ports:
+      - "8080:8080"
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+      - ./infra/keycloak/taskflow-realm.json:/opt/keycloak/data/import/taskflow-realm.json:ro
+
 volumes:
   taskflow_pgdata:
+  keycloak_data:

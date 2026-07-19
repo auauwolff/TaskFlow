@@ -1,7 +1,7 @@
 /* oxlint-disable react/only-export-components -- Route modules export TanStack's route contract. */
 import { createFileRoute } from '@tanstack/react-router'
 import { ProjectsPage } from '@/features/projects/presentation/ProjectsPage'
-import { OnboardingPage } from '@/features/session/presentation/OnboardingPage'
+import { SignInPage } from '@/features/session/presentation/SignInPage'
 import { useSession } from '@/features/session/presentation/useSession'
 
 export const Route = createFileRoute('/')({
@@ -13,10 +13,10 @@ function HomePage() {
 
   if (session.status === 'anonymous')
     return (
-      <OnboardingPage
+      <SignInPage
         error={session.error}
-        isCreating={session.isCreating}
-        onCreate={session.createUser}
+        isSigningIn={session.isSigningIn}
+        onSignIn={session.signIn}
       />
     )
 

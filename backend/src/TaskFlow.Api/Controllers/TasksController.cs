@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TaskFlow.Application.Tasks;
 
 namespace TaskFlow.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/tasks")]
 public sealed class TasksController(ITaskService tasks) : ControllerBase
 {

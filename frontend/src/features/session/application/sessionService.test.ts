@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { AppError } from '@/shared/errors/appError'
 import { userId, type User } from '../domain/user'
-import type { CurrentUserStorage, UsersGateway } from './ports'
+import type { AuthenticationGateway } from './ports'
 import { createSessionService } from './sessionService'
 
 const existingUser: User = {
@@ -10,55 +9,38 @@ const existingUser: User = {
   email: 'ada@example.com',
 }
 
-function createStorage(initialId: string | null): CurrentUserStorage {
-  let storedId = initialId === null ? null : userId(initialId)
-
+function createAuthentication(): AuthenticationGateway {
   return {
-    read: vi.fn(() => storedId),
-    write: vi.fn((id) => {
-      storedId = id
-    }),
-    clear: vi.fn(() => {
-      storedId = null
-    }),
+    current: vi.fn().mockResolvedValue(existingUser),
+    signIn: vi.fn().mockResolvedValue(undefined),
+    signOut: vi.fn().mockResolvedValue(undefined),
   }
 }
 
 describe('createSessionService', () => {
-  it('does not call the API when no user ID is stored', async () => {
-    const users: UsersGateway = {
-      getById: vi.fn(),
-      create: vi.fn(),
-    }
-    const service = createSessionService(users, createStorage(null))
+  it('restores the current user through the authentication port', async () => {
+    const authentication = createAuthentication()
+    const service = createSessionService(authentication)
 
-    await expect(service.restore()).resolves.toBeNull()
-    expect(users.getById).not.toHaveBeenCalled()
+    await expect(service.restore()).resolves.toEqual(existingUser)
+    expect(authentication.current).toHaveBeenCalledOnce()
   })
 
-  it('clears a stale stored ID when the API no longer has that user', async () => {
-    const storage = createStorage(existingUser.id)
-    const users: UsersGateway = {
-      getById: vi.fn().mockRejectedValue(new AppError('User was not found.', 'not-found', 404)),
-      create: vi.fn(),
-    }
-    const service = createSessionService(users, storage)
+  it('starts sign-in without knowing the configured identity provider', async () => {
+    const authentication = createAuthentication()
+    const service = createSessionService(authentication)
 
-    await expect(service.restore()).resolves.toBeNull()
-    expect(storage.clear).toHaveBeenCalledOnce()
+    await service.signIn('/')
+
+    expect(authentication.signIn).toHaveBeenCalledWith('/')
   })
 
-  it('persists the ID returned by user creation', async () => {
-    const storage = createStorage(null)
-    const users: UsersGateway = {
-      getById: vi.fn(),
-      create: vi.fn().mockResolvedValue(existingUser),
-    }
-    const service = createSessionService(users, storage)
+  it('signs out through the authentication port', async () => {
+    const authentication = createAuthentication()
+    const service = createSessionService(authentication)
 
-    await expect(
-      service.create({ name: existingUser.name, email: existingUser.email }),
-    ).resolves.toEqual(existingUser)
-    expect(storage.write).toHaveBeenCalledWith(existingUser.id)
+    await service.signOut()
+
+    expect(authentication.signOut).toHaveBeenCalledOnce()
   })
 })

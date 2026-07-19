@@ -1,0 +1,45 @@
+interface SignInPageProps {
+  error: string | null
+  isSigningIn: boolean
+  onSignIn(): void
+}
+
+export function SignInPage({ error, isSigningIn, onSignIn }: SignInPageProps) {
+  return (
+    <main className="onboarding page-frame">
+      <section className="intro-panel">
+        <p className="eyebrow">Your focused workspace</p>
+        <h1>Turn plans into steady progress.</h1>
+        <p className="summary">
+          TaskFlow keeps identity at the boundary. Sign in securely, then organize projects and
+          tasks without exposing provider details to the application.
+        </p>
+      </section>
+
+      <section className="form-card">
+        <div className="form-heading">
+          <span className="step-number">01</span>
+          <div>
+            <h2>Enter your workspace</h2>
+            <p>Continue through the configured OpenID Connect provider.</p>
+          </div>
+        </div>
+
+        {error === null ? null : (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+
+        <button
+          className="primary-button"
+          type="button"
+          disabled={isSigningIn}
+          onClick={onSignIn}
+        >
+          {isSigningIn ? 'Redirecting...' : 'Sign in securely'}
+        </button>
+      </section>
+    </main>
+  )
+}

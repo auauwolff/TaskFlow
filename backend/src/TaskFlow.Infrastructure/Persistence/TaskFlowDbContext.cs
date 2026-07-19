@@ -19,6 +19,7 @@ public sealed class TaskFlowDbContext : DbContext, IUnitOfWork
     // A DbSet<T> is a queryable, addable collection backed by a table. The property name doubles
     // as the default table name — but we set table names explicitly in the configurations below.
     public DbSet<User> Users => Set<User>();
+    public DbSet<ExternalIdentity> ExternalIdentities => Set<ExternalIdentity>();
     public DbSet<Project> Projects => Set<Project>();
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
 

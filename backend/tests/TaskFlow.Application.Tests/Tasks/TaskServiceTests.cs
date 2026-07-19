@@ -14,19 +14,23 @@ namespace TaskFlow.Application.Tests.Tasks;
 public sealed class TaskServiceTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 18, 12, 0, 0, TimeSpan.Zero);
+    private readonly Guid _ownerId = Guid.NewGuid();
     private readonly ITaskItemRepository _tasks = Substitute.For<ITaskItemRepository>();
     private readonly IProjectRepository _projects = Substitute.For<IProjectRepository>();
     private readonly IUserRepository _users = Substitute.For<IUserRepository>();
+    private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly TestTimeProvider _timeProvider = new(Now);
     private readonly TaskService _service;
 
     public TaskServiceTests()
     {
+        _currentUser.UserId.Returns(_ownerId);
         _service = new TaskService(
             _tasks,
             _projects,
             _users,
+            _currentUser,
             _unitOfWork,
             new CreateTaskRequestValidator(),
             new AssignTaskRequestValidator(),
@@ -36,8 +40,7 @@ public sealed class TaskServiceTests
     [Fact]
     public async Task CreateAsync_ValidRequest_VerifiesProjectAddsAndSaves()
     {
-        var ownerId = Guid.NewGuid();
-        var project = Project.Create("TaskFlow", ownerId, _timeProvider);
+        var project = Project.Create("TaskFlow", _ownerId, _timeProvider);
         var request = new CreateTaskRequest(project.Id, "  Write tests  ", TaskPriority.High, "Phase 5");
         TaskItem? addedTask = null;
         _projects.GetByIdAsync(project.Id, Arg.Any<CancellationToken>()).Returns(project);
@@ -88,8 +91,9 @@ public sealed class TaskServiceTests
     [Fact]
     public async Task CompleteAsync_ExistingTask_CompletesAndSavesTrackedEntity()
     {
-        var task = CreateTask();
+        var (project, task) = CreateTask();
         _tasks.GetByIdAsync(task.Id, Arg.Any<CancellationToken>()).Returns(task);
+        _projects.GetByIdAsync(project.Id, Arg.Any<CancellationToken>()).Returns(project);
         _timeProvider.UtcNow = Now.AddHours(1);
 
         var result = await _service.CompleteAsync(task.Id);
@@ -117,9 +121,10 @@ public sealed class TaskServiceTests
     [Fact]
     public async Task AssignAsync_ValidRequest_AssignsAndSaves()
     {
-        var task = CreateTask();
+        var (project, task) = CreateTask();
         var assignee = User.Create("Ada", Email.Create("ada@example.com"));
         _tasks.GetByIdAsync(task.Id, Arg.Any<CancellationToken>()).Returns(task);
+        _projects.GetByIdAsync(project.Id, Arg.Any<CancellationToken>()).Returns(project);
         _users.GetByIdAsync(assignee.Id, Arg.Any<CancellationToken>()).Returns(assignee);
 
         var result = await _service.AssignAsync(task.Id, new AssignTaskRequest(assignee.Id));
@@ -147,9 +152,10 @@ public sealed class TaskServiceTests
     [Fact]
     public async Task AssignAsync_MissingAssignee_DoesNotMutateOrSave()
     {
-        var task = CreateTask();
+        var (project, task) = CreateTask();
         var assigneeId = Guid.NewGuid();
         _tasks.GetByIdAsync(task.Id, Arg.Any<CancellationToken>()).Returns(task);
+        _projects.GetByIdAsync(project.Id, Arg.Any<CancellationToken>()).Returns(project);
         _users.GetByIdAsync(assigneeId, Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<User?>(null));
 
@@ -161,6 +167,23 @@ public sealed class TaskServiceTests
         await _unitOfWork.DidNotReceiveWithAnyArgs().SaveChangesAsync(default);
     }
 
-    private TaskItem CreateTask() =>
-        TaskItem.Create(Guid.NewGuid(), "Write tests", _timeProvider);
+    [Fact]
+    public async Task GetByIdAsync_TaskInAnotherUsersProject_ReturnsNotFound()
+    {
+        var project = Project.Create("Private", Guid.NewGuid(), _timeProvider);
+        var task = TaskItem.Create(project.Id, "Secret", _timeProvider);
+        _tasks.GetByIdAsync(task.Id, Arg.Any<CancellationToken>()).Returns(task);
+        _projects.GetByIdAsync(project.Id, Arg.Any<CancellationToken>()).Returns(project);
+
+        var act = () => _service.GetByIdAsync(task.Id);
+
+        await act.Should().ThrowAsync<NotFoundException>()
+            .WithMessage($"Project with id '{project.Id}' was not found.");
+    }
+
+    private (Project Project, TaskItem Task) CreateTask()
+    {
+        var project = Project.Create("TaskFlow", _ownerId, _timeProvider);
+        return (project, TaskItem.Create(project.Id, "Write tests", _timeProvider));
+    }
 }

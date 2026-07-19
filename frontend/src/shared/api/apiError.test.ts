@@ -14,4 +14,12 @@ describe('apiError', () => {
     expect(error.message).toBe('Validation failed')
     expect(error.fieldErrors).toEqual({ Name: ['Name is required.'] })
   })
+
+  it('distinguishes an expired authentication session', () => {
+    const error = apiError(new Response(null, { status: 401 }), {
+      title: 'Unauthorized',
+    })
+
+    expect(error.kind).toBe('unauthorized')
+  })
 })

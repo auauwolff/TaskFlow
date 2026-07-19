@@ -41,6 +41,7 @@ The app (a task/project manager) is intentionally trivial. **The architecture is
 | API docs | `Microsoft.AspNetCore.OpenApi` (+ Swagger UI later) | .NET 10 dropped Swashbuckle from the template. |
 | Tests | xUnit + NSubstitute + FluentAssertions | Phase 5. |
 | Frontend | React 19 + Vite + TypeScript + TanStack Router/Query + XState (pnpm) | Feature-first Hexagonal Architecture; ASP.NET remains the single backend. |
+| Authentication | Generic OIDC + ASP.NET `HttpOnly` cookie BFF; Keycloak locally | Provider details remain in the API adapter/configuration; TaskFlow uses its own internal user ID. |
 | Solution file | **`.slnx`** (new XML format) | .NET 10 default. |
 
 **Deferred on purpose** (introduced later as "upgrades" so I feel the problem they solve):
@@ -49,7 +50,8 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 ## 📍 Current status
 
 - **Done:** Phase 0 ✅, Phase 1 ✅, Phase 2 ✅, Phase 3 ✅, Phase 4 ✅, Phase 5 ✅
-- **In progress:** Phase 6 — user/project frontend integration complete; tasks and full-stack Docker Compose next.
+- **In progress:** Phase 6 — provider-neutral authentication and user/project integration complete;
+  tasks and full-stack application containers next.
 - **Last updated:** 2026-07-19
 
 ## 🗺️ Roadmap & checklist
@@ -86,6 +88,38 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 4. Tell Claude "continue with Phase N" (or `/loop`-style: "pick up where PROGRESS.md says").
 
 ## 📓 Session log
+
+### 2026-07-19 — Phase 6c 🚧 Provider-neutral OIDC authentication
+- Replaced the browser-selected development identity with a real OIDC authorization-code + PKCE
+  flow owned by ASP.NET. React calls stable TaskFlow login/me/logout endpoints and never sees a
+  provider SDK, access token, client secret, issuer, or subject.
+- Added the frontend `AuthenticationGateway` port and HTTP adapter. The composition root now selects
+  that adapter; the session service and XState machine model restore/sign-in/sign-out without caring
+  which provider implements OIDC.
+- Added `ExternalIdentity` plus a unique `(issuer, subject)` mapping to an internal TaskFlow `User`.
+  First login provisions a user; later logins retain the TaskFlow ID and refresh profile data. Email
+  remains profile data and is not the authentication key. A verified provider email may safely link
+  a persisted pre-authentication user; an unverified duplicate is rejected.
+- Added the Application-owned `ICurrentUser` port and ASP.NET claims adapter. Project requests no
+  longer accept `ownerId`; project creation/listing derive it from the authenticated cookie.
+- Protected project/task controllers and scoped project/task reads and mutations to the current
+  owner, closing the authenticated cross-user IDOR path while returning 404 for concealed resources.
+- Added centralized antiforgery token validation for every cookie-authenticated API write. Unauthorized
+  API fetches return 401; only the explicit login endpoint challenges the OIDC provider.
+- Added a local Keycloak Compose service and imported realm as a replaceable development adapter.
+  Generic `Authentication:Oidc` settings can target another compliant provider.
+- Logout uses an antiforgery-protected browser POST, clears the TaskFlow cookie, and completes the
+  provider's OIDC end-session flow. Authenticated Query data and cached antiforgery tokens are cleared
+  when the frontend crosses back to anonymous state.
+- End-to-end smoke: login as the imported Ada account, auto-provision the internal user, create/list
+  a server-owned project through Vite, reject a tokenless write with 400, then complete local and
+  provider logout (`/api/auth/me`: 200 → 401; the next login requires credentials again).
+- Verification: strict backend build passed with 48/48 tests; frontend lint, dependency rules,
+  production build, and 10/10 tests passed; NuGet and pnpm reported no known vulnerabilities.
+- Supersedes Phase 6b's temporary `UsersGateway`/`CurrentUserStorage` development identity. The
+  original entry remains below as the learning history that motivated the authentication boundary.
+- **Next:** integrate task Query/view models, fix string-enum representation in generated OpenAPI,
+  then add API/frontend containers and the production reverse proxy.
 
 ### 2026-07-19 — Phase 6b 🚧 Frontend hexagon + first live vertical slice
 - Documented the frontend dependency rule and state-ownership matrix in `frontend/ARCHITECTURE.md`.

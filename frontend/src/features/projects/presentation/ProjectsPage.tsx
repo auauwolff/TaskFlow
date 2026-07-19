@@ -36,7 +36,7 @@ export function ProjectsPage({ user, sessionError, onSignOut }: ProjectsPageProp
           <h1>{user.name}&apos;s projects</h1>
         </div>
         <button className="text-button" type="button" onClick={onSignOut}>
-          Change user
+          Log out
         </button>
       </section>
 

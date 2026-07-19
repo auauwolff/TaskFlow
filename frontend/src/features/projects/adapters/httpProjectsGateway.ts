@@ -1,6 +1,6 @@
-import type { UserId } from '@/features/session/domain/user'
 import { userId } from '@/features/session/domain/user'
 import { apiError, networkError } from '@/shared/api/apiError'
+import type { AntiforgeryClient } from '@/shared/api/antiforgery'
 import type { ApiClient } from '@/shared/api/client'
 import type { components } from '@/shared/api/schema'
 import { AppError } from '@/shared/errors/appError'
@@ -9,12 +9,14 @@ import { projectId, type Project } from '../domain/project'
 
 type ProjectDto = components['schemas']['ProjectDto']
 
-export function createHttpProjectsGateway(client: ApiClient): ProjectsGateway {
+export function createHttpProjectsGateway(
+  client: ApiClient,
+  antiforgery: AntiforgeryClient,
+): ProjectsGateway {
   return {
-    async listByOwner(ownerId: UserId, signal?: AbortSignal) {
+    async list(signal?: AbortSignal) {
       try {
         const { data, error, response } = await client.GET('/api/projects', {
-          params: { query: { ownerId } },
           signal,
         })
 
@@ -29,10 +31,12 @@ export function createHttpProjectsGateway(client: ApiClient): ProjectsGateway {
       try {
         const { data, error, response } = await client.POST('/api/projects', {
           body: input,
+          headers: await antiforgery.header(signal),
           signal,
         })
 
         if (data !== undefined) return toProject(data)
+        antiforgery.clear()
         throw apiError(response, error)
       } catch (error) {
         throw networkError(error)

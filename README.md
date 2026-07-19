@@ -13,6 +13,7 @@ point is the _architecture_, not the features.
 - **.NET 10** (LTS) + **ASP.NET Core Web API** (controllers)
 - **EF Core** + **Npgsql** + **PostgreSQL** (in Docker)
 - **FluentValidation**, **Serilog**, **OpenAPI/Swagger**
+- **OpenID Connect** + ASP.NET secure cookie BFF authentication
 - **xUnit** + **NSubstitute** + **FluentAssertions**
 - **React 19** + **Vite** + **TypeScript** + **TanStack Router/Query** + **XState** (pnpm)
 
@@ -52,11 +53,11 @@ The references are enforced by the compiler: if `Domain` ever tried to reference
 # 1. Build the backend
 dotnet build backend/TaskFlow.slnx
 
-# 2. Start Postgres
-docker compose up -d postgres
+# 2. Start Postgres and the local OIDC provider
+docker compose up -d postgres keycloak
 
 # 3. Apply migrations
-dotnet ef database update --project backend/src/TaskFlow.Infrastructure --startup-project backend/src/TaskFlow.Infrastructure
+dotnet ef database update --project backend/src/TaskFlow.Infrastructure
 
 # 4. Run the API
 dotnet run --project backend/src/TaskFlow.Api
@@ -68,6 +69,22 @@ dotnet test backend/TaskFlow.slnx
 pnpm --dir frontend install
 pnpm --dir frontend dev
 ```
+
+Open `http://localhost:5173` and use the imported development account:
+
+```text
+Username: ada
+Password: taskflow
+```
+
+Keycloak is only the local development OIDC adapter. TaskFlow depends on standard OIDC claims and
+ASP.NET authentication abstractions, so another OIDC provider is selected through
+`Authentication:Oidc` configuration rather than frontend or Application-layer changes. Never use
+the committed development client secret or demo credentials outside local development.
+
+The required provider settings are `Authority`, `ClientId`, `ClientSecret`, and `PublicOrigin`.
+Keycloak imports the development realm only when it does not already exist; remove the
+`keycloak_data` volume when intentionally re-importing changed realm configuration.
 
 ## Repository layout
 

@@ -10,7 +10,7 @@ export const projectKeys = {
 export function projectsByOwnerOptions(gateway: ProjectsGateway, ownerId: UserId) {
   return queryOptions({
     queryKey: projectKeys.byOwner(ownerId),
-    queryFn: ({ signal }) => gateway.listByOwner(ownerId, signal),
+    queryFn: ({ signal }) => gateway.list(signal),
   })
 }
 

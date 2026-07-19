@@ -24,6 +24,8 @@ public sealed class Email : ValueObject
         // One canonical representation keeps Domain equality, repository lookups and the
         // database's unique text index consistent.
         value = value.Trim().ToLowerInvariant();
+        if (value.Length > 320)
+            throw new DomainException("Email cannot exceed 320 characters.");
 
         // Deliberately minimal — exactly one '@', not at the very start or end. Heavier,
         // user-facing validation belongs in the Application layer's validators (Phase 2).

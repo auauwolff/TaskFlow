@@ -25,7 +25,7 @@ public static class DependencyInjection
 
         // Scan this assembly and register every AbstractValidator<T> as IValidator<T>, so the
         // services above can have their IValidator<...> dependencies injected automatically.
-        services.AddValidatorsFromAssemblyContaining<CreateUserRequestValidator>();
+        services.AddValidatorsFromAssemblyContaining<CreateProjectRequestValidator>();
 
         return services;
     }

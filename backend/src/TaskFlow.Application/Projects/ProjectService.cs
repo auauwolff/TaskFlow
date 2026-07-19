@@ -9,20 +9,20 @@ namespace TaskFlow.Application.Projects;
 public sealed class ProjectService : IProjectService
 {
     private readonly IProjectRepository _projects;
-    private readonly IUserRepository _users;          // needed to verify the owner exists
+    private readonly ICurrentUser _currentUser;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IValidator<CreateProjectRequest> _validator;
     private readonly TimeProvider _timeProvider;
 
     public ProjectService(
         IProjectRepository projects,
-        IUserRepository users,
+        ICurrentUser currentUser,
         IUnitOfWork unitOfWork,
         IValidator<CreateProjectRequest> validator,
         TimeProvider timeProvider)
     {
         _projects = projects;
-        _users = users;
+        _currentUser = currentUser;
         _unitOfWork = unitOfWork;
         _validator = validator;
         _timeProvider = timeProvider;
@@ -32,13 +32,11 @@ public sealed class ProjectService : IProjectService
     {
         await _validator.ValidateAndThrowAsync(request, cancellationToken);
 
-        // Cross-aggregate check: a project's owner must be a real user. Coordinating two
-        // aggregates like this is exactly the Application layer's job — the Project entity can't
-        // (and shouldn't) reach out to the user store itself.
-        if (await _users.GetByIdAsync(request.OwnerId, cancellationToken) is null)
-            throw new NotFoundException(nameof(User), request.OwnerId);
-
-        var project = Project.Create(request.Name, request.OwnerId, _timeProvider, request.Description);
+        var project = Project.Create(
+            request.Name,
+            _currentUser.UserId,
+            _timeProvider,
+            request.Description);
 
         await _projects.AddAsync(project, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -49,14 +47,17 @@ public sealed class ProjectService : IProjectService
     public async Task<ProjectDto> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var project = await _projects.GetByIdAsync(id, cancellationToken)
-                      ?? throw new NotFoundException(nameof(Project), id);
+                       ?? throw new NotFoundException(nameof(Project), id);
+
+        if (project.OwnerId != _currentUser.UserId)
+            throw new NotFoundException(nameof(Project), id);
 
         return project.ToDto();
     }
 
-    public async Task<IReadOnlyList<ProjectDto>> ListByOwnerAsync(Guid ownerId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ProjectDto>> ListAsync(CancellationToken cancellationToken = default)
     {
-        var projects = await _projects.ListByOwnerAsync(ownerId, cancellationToken);
+        var projects = await _projects.ListByOwnerAsync(_currentUser.UserId, cancellationToken);
         return projects.Select(p => p.ToDto()).ToList();
     }
 }
