@@ -9,39 +9,42 @@ import { projectId, type Project } from '../domain/project'
 
 type ProjectDto = components['schemas']['ProjectDto']
 
-export function createHttpProjectsGateway(
-  client: ApiClient,
-  antiforgery: AntiforgeryClient,
-): ProjectsGateway {
-  return {
-    async list(signal?: AbortSignal) {
-      try {
-        const { data, error, response } = await client.GET('/api/projects', {
-          signal,
-        })
+export class HttpProjectsGateway implements ProjectsGateway {
+  private readonly client: ApiClient
+  private readonly antiforgery: AntiforgeryClient
 
-        if (data !== undefined) return data.map(toProject)
-        throw apiError(response, error)
-      } catch (error) {
-        throw networkError(error)
-      }
-    },
+  constructor(client: ApiClient, antiforgery: AntiforgeryClient) {
+    this.client = client
+    this.antiforgery = antiforgery
+  }
 
-    async create(input: CreateProjectInput, signal?: AbortSignal) {
-      try {
-        const { data, error, response } = await client.POST('/api/projects', {
-          body: input,
-          headers: await antiforgery.header(signal),
-          signal,
-        })
+  async list(signal?: AbortSignal): Promise<Project[]> {
+    try {
+      const { data, error, response } = await this.client.GET('/api/projects', {
+        signal,
+      })
 
-        if (data !== undefined) return toProject(data)
-        antiforgery.clear()
-        throw apiError(response, error)
-      } catch (error) {
-        throw networkError(error)
-      }
-    },
+      if (data !== undefined) return data.map(toProject)
+      throw apiError(response, error)
+    } catch (error) {
+      throw networkError(error)
+    }
+  }
+
+  async create(input: CreateProjectInput, signal?: AbortSignal): Promise<Project> {
+    try {
+      const { data, error, response } = await this.client.POST('/api/projects', {
+        body: input,
+        headers: await this.antiforgery.header(signal),
+        signal,
+      })
+
+      if (data !== undefined) return toProject(data)
+      this.antiforgery.clear()
+      throw apiError(response, error)
+    } catch (error) {
+      throw networkError(error)
+    }
   }
 }
 

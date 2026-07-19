@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { userId, type User } from '../domain/user'
 import type { AuthenticationGateway } from './ports'
-import { createSessionService } from './sessionService'
+import { SessionService } from './sessionService'
 
 const existingUser: User = {
   id: userId('6731a3a4-1012-455c-9c71-2ac04285d882'),
@@ -17,10 +17,10 @@ function createAuthentication(): AuthenticationGateway {
   }
 }
 
-describe('createSessionService', () => {
+describe('SessionService', () => {
   it('restores the current user through the authentication port', async () => {
     const authentication = createAuthentication()
-    const service = createSessionService(authentication)
+    const service = new SessionService(authentication)
 
     await expect(service.restore()).resolves.toEqual(existingUser)
     expect(authentication.current).toHaveBeenCalledOnce()
@@ -28,7 +28,7 @@ describe('createSessionService', () => {
 
   it('starts sign-in without knowing the configured identity provider', async () => {
     const authentication = createAuthentication()
-    const service = createSessionService(authentication)
+    const service = new SessionService(authentication)
 
     await service.signIn('/')
 
@@ -37,7 +37,7 @@ describe('createSessionService', () => {
 
   it('signs out through the authentication port', async () => {
     const authentication = createAuthentication()
-    const service = createSessionService(authentication)
+    const service = new SessionService(authentication)
 
     await service.signOut()
 

@@ -22,6 +22,24 @@ app/composition
 Layers are created inside a feature only when that feature has code for them. Empty ceremonial
 layers are avoided.
 
+## Composition and object style
+
+`createAppRuntime()` is the manual composition root. It creates the object graph once, in dependency
+order, before React renders. `AppRuntime` is the narrow set of root dependencies published through
+focused providers; it is not a service locator and feature code never receives the complete runtime.
+
+- Ports remain TypeScript interfaces.
+- Stateful HTTP adapters and application services are constructor-injected classes implementing
+  those interfaces.
+- React components, hooks, composition factories, Query/XState configuration, DTO mappings, and pure
+  domain operations remain functions.
+- A class is introduced for meaningful dependency ownership, state, identity, or lifecycle, not just
+  because code lives outside React.
+
+This gives object-graph nodes an explicit shape without wrapping the generated API client or pure
+operations in ceremonial classes. Construction remains visible in `app/composition.ts`; no class
+resolves dependencies from a global container.
+
 `pnpm architecture` enforces these import directions and rejects circular dependencies. The rules
 live in `.dependency-cruiser.cjs`, making the dependency rule executable rather than conventional.
 
@@ -34,7 +52,7 @@ live in `.dependency-cruiser.cjs`, making the dependency rule executable rather 
 | OIDC protocol, tokens, and session cookie | ASP.NET authentication adapter |
 | Selected resource and shareable filters | Router path/search parameters |
 | Form values and local interaction state | React |
-| Stable gateways and services | Application dependency context |
+| Stable gateways and services | `AppRuntime` through focused dependency contexts |
 
 Server data is never copied into a second global client store. XState models workflows, not the
 API cache. React Context distributes stable dependencies and the session actor, not frequently

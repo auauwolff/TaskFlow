@@ -2,17 +2,17 @@ import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { useEffect, type PropsWithChildren } from 'react'
 import { ProjectsGatewayContext } from '@/features/projects/presentation/projectsGatewayContext'
 import { SessionActorContext } from '@/features/session/presentation/sessionContext'
-import type { Application } from './composition'
+import type { AppRuntime } from './composition'
 
 interface AppProvidersProps extends PropsWithChildren {
-  application: Application
+  runtime: AppRuntime
 }
 
-export function AppProviders({ application, children }: AppProvidersProps) {
+export function AppProviders({ runtime, children }: AppProvidersProps) {
   return (
-    <ProjectsGatewayContext value={application.projects}>
-      <QueryClientProvider client={application.queryClient}>
-        <SessionActorContext.Provider logic={application.sessionLogic}>
+    <ProjectsGatewayContext value={runtime.projects}>
+      <QueryClientProvider client={runtime.queryClient}>
+        <SessionActorContext.Provider logic={runtime.sessionLogic}>
           <AuthenticatedCacheBoundary>{children}</AuthenticatedCacheBoundary>
         </SessionActorContext.Provider>
       </QueryClientProvider>

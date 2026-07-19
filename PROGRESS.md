@@ -96,6 +96,11 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 - Added the frontend `AuthenticationGateway` port and HTTP adapter. The composition root now selects
   that adapter; the session service and XState machine model restore/sign-in/sign-out without caring
   which provider implements OIDC.
+- Clarified the frontend object model: stateful antiforgery/authentication/project adapters and the
+  session application service are constructor-injected classes implementing narrow contracts;
+  `createAppRuntime()` remains the functional manual composition root, while React, mappings, and
+  Query/XState configuration remain functional. Focused contexts expose dependencies, not a generic
+  API service or service locator.
 - Added `ExternalIdentity` plus a unique `(issuer, subject)` mapping to an internal TaskFlow `User`.
   First login provisions a user; later logins retain the TaskFlow ID and refresh profile data. Email
   remains profile data and is not the authentication key. A verified provider email may safely link

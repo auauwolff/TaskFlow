@@ -1,5 +1,5 @@
 import { assign, fromPromise, setup } from 'xstate'
-import type { SessionService } from '../application/sessionService'
+import type { SessionUseCases } from '../application/sessionService'
 import type { User } from '../domain/user'
 
 interface SessionContext {
@@ -116,7 +116,7 @@ export const sessionMachine = setup({
   },
 })
 
-export function provideSessionMachine(service: SessionService) {
+export function provideSessionMachine(service: SessionUseCases) {
   return sessionMachine.provide({
     actors: {
       restoreSession: fromPromise(({ signal }) => service.restore(signal)),

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ApiClient } from './client'
-import { createAntiforgeryClient } from './antiforgery'
+import { HttpAntiforgeryClient } from './antiforgery'
 
-describe('createAntiforgeryClient', () => {
+describe('HttpAntiforgeryClient', () => {
   it('reuses a token until the authenticated boundary clears it', async () => {
     const get = vi
       .fn()
@@ -15,7 +15,7 @@ describe('createAntiforgeryClient', () => {
         response: new Response(null, { status: 200 }),
       })
     const client = { GET: get } as unknown as ApiClient
-    const antiforgery = createAntiforgeryClient(client)
+    const antiforgery = new HttpAntiforgeryClient(client)
 
     await expect(antiforgery.header()).resolves.toEqual({
       'X-CSRF-TOKEN': 'first-token',

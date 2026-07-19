@@ -1,6 +1,6 @@
 import { createActor, waitFor } from 'xstate'
 import { describe, expect, it, vi } from 'vitest'
-import type { SessionService } from '../application/sessionService'
+import type { SessionUseCases } from '../application/sessionService'
 import { userId, type User } from '../domain/user'
 import { provideSessionMachine } from './sessionMachine'
 
@@ -12,7 +12,7 @@ const currentUser: User = {
 
 describe('sessionMachine', () => {
   it('restores an authenticated session', async () => {
-    const service: SessionService = {
+    const service: SessionUseCases = {
       restore: vi.fn().mockResolvedValue(currentUser),
       signIn: vi.fn(),
       signOut: vi.fn(),
@@ -26,7 +26,7 @@ describe('sessionMachine', () => {
   })
 
   it('starts provider-neutral sign-in from an anonymous session', async () => {
-    const service: SessionService = {
+    const service: SessionUseCases = {
       restore: vi.fn().mockResolvedValue(null),
       signIn: vi.fn().mockResolvedValue(undefined),
       signOut: vi.fn(),
@@ -45,7 +45,7 @@ describe('sessionMachine', () => {
   })
 
   it('moves to anonymous after signing out', async () => {
-    const service: SessionService = {
+    const service: SessionUseCases = {
       restore: vi.fn().mockResolvedValue(currentUser),
       signIn: vi.fn(),
       signOut: vi.fn().mockResolvedValue(undefined),
@@ -62,7 +62,7 @@ describe('sessionMachine', () => {
 
   it('keeps the current user ready when sign-out fails', async () => {
     const failure = new Error('Sign-out failed.')
-    const service: SessionService = {
+    const service: SessionUseCases = {
       restore: vi.fn().mockResolvedValue(currentUser),
       signIn: vi.fn(),
       signOut: vi.fn().mockRejectedValue(failure),

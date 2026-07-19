@@ -6,30 +6,36 @@ export interface AntiforgeryClient {
   clear(): void
 }
 
-export function createAntiforgeryClient(client: ApiClient): AntiforgeryClient {
-  let token: Promise<string> | null = null
+export class HttpAntiforgeryClient implements AntiforgeryClient {
+  private readonly client: ApiClient
+  private token: Promise<string> | null = null
 
-  return {
-    async header(signal) {
-      token ??= loadToken(client, signal).catch((error) => {
-        token = null
-        throw error
-      })
-
-      return { 'X-CSRF-TOKEN': await token }
-    },
-    clear: () => {
-      token = null
-    },
+  constructor(client: ApiClient) {
+    this.client = client
   }
-}
 
-async function loadToken(client: ApiClient, signal?: AbortSignal): Promise<string> {
-  try {
-    const { data, error, response } = await client.GET('/api/auth/antiforgery', { signal })
-    if (data !== undefined) return data.token
-    throw apiError(response, error)
-  } catch (error) {
-    throw networkError(error)
+  async header(signal?: AbortSignal): Promise<Record<'X-CSRF-TOKEN', string>> {
+    this.token ??= this.loadToken(signal).catch((error) => {
+      this.token = null
+      throw error
+    })
+
+    return { 'X-CSRF-TOKEN': await this.token }
+  }
+
+  clear(): void {
+    this.token = null
+  }
+
+  private async loadToken(signal?: AbortSignal): Promise<string> {
+    try {
+      const { data, error, response } = await this.client.GET('/api/auth/antiforgery', {
+        signal,
+      })
+      if (data !== undefined) return data.token
+      throw apiError(response, error)
+    } catch (error) {
+      throw networkError(error)
+    }
   }
 }

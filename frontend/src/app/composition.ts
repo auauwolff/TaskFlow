@@ -1,37 +1,41 @@
 import { QueryClient } from '@tanstack/react-query'
 import type { ProjectsGateway } from '@/features/projects/application/ports'
-import { createHttpProjectsGateway } from '@/features/projects/adapters/httpProjectsGateway'
-import { createHttpAuthenticationGateway } from '@/features/session/adapters/httpAuthenticationGateway'
-import { createSessionService } from '@/features/session/application/sessionService'
+import { HttpProjectsGateway } from '@/features/projects/adapters/httpProjectsGateway'
+import { HttpAuthenticationGateway } from '@/features/session/adapters/httpAuthenticationGateway'
+import { SessionService } from '@/features/session/application/sessionService'
 import { provideSessionMachine } from '@/features/session/presentation/sessionMachine'
 import { createApiClient } from '@/shared/api/client'
-import { createAntiforgeryClient } from '@/shared/api/antiforgery'
+import { HttpAntiforgeryClient } from '@/shared/api/antiforgery'
 import { AppError } from '@/shared/errors/appError'
 
-export interface Application {
+export interface AppRuntime {
   queryClient: QueryClient
   projects: ProjectsGateway
   sessionLogic: ReturnType<typeof provideSessionMachine>
 }
 
-export function createApplication(): Application {
+export function createAppRuntime(): AppRuntime {
   const apiClient = createApiClient()
-  const antiforgery = createAntiforgeryClient(apiClient)
-  const authentication = createHttpAuthenticationGateway(apiClient, antiforgery)
-  const projects = createHttpProjectsGateway(apiClient, antiforgery)
-  const session = createSessionService(authentication)
+  const antiforgery = new HttpAntiforgeryClient(apiClient)
+  const authentication = new HttpAuthenticationGateway(apiClient, antiforgery)
+  const projects = new HttpProjectsGateway(apiClient, antiforgery)
+  const session = new SessionService(authentication)
 
   return {
-    queryClient: new QueryClient({
-      defaultOptions: {
-        queries: {
-          staleTime: 30_000,
-          retry: (attempt, error) =>
-            error instanceof AppError && error.kind === 'network' && attempt < 2,
-        },
-      },
-    }),
+    queryClient: createQueryClient(),
     projects,
     sessionLogic: provideSessionMachine(session),
   }
+}
+
+function createQueryClient(): QueryClient {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 30_000,
+        retry: (attempt, error) =>
+          error instanceof AppError && error.kind === 'network' && attempt < 2,
+      },
+    },
+  })
 }
