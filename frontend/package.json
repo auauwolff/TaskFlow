@@ -16,11 +16,10 @@
   "dependencies": {
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-router": "^1.170.18",
-    "@xstate/react": "^6.1.0",
     "openapi-fetch": "^0.17.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "xstate": "^5.32.5"
+    "react-hook-form": "^7.82.0"
   },
   "devDependencies": {
     "@tanstack/router-plugin": "^1.168.22",

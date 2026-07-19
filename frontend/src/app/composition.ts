@@ -2,8 +2,7 @@ import { QueryClient } from '@tanstack/react-query'
 import type { ProjectsGateway } from '@/features/projects/application/ports'
 import { HttpProjectsGateway } from '@/features/projects/adapters/httpProjectsGateway'
 import { HttpAuthenticationGateway } from '@/features/session/adapters/httpAuthenticationGateway'
-import { SessionService } from '@/features/session/application/sessionService'
-import { provideSessionMachine } from '@/features/session/presentation/sessionMachine'
+import { SessionService, type SessionUseCases } from '@/features/session/application/sessionService'
 import { createApiClient } from '@/shared/api/client'
 import { HttpAntiforgeryClient } from '@/shared/api/antiforgery'
 import { AppError } from '@/shared/errors/appError'
@@ -11,7 +10,7 @@ import { AppError } from '@/shared/errors/appError'
 export interface AppRuntime {
   queryClient: QueryClient
   projects: ProjectsGateway
-  sessionLogic: ReturnType<typeof provideSessionMachine>
+  session: SessionUseCases
 }
 
 export function createAppRuntime(): AppRuntime {
@@ -24,7 +23,7 @@ export function createAppRuntime(): AppRuntime {
   return {
     queryClient: createQueryClient(),
     projects,
-    sessionLogic: provideSessionMachine(session),
+    session,
   }
 }
 

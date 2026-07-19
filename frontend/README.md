@@ -1,9 +1,9 @@
 # TaskFlow Frontend
 
 React and TypeScript client for TaskFlow. Vite handles development and production builds,
-TanStack Router provides type-safe file-based routing, TanStack Query owns API state, and XState
-models the authentication workflow. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the
-feature-first Hexagonal Architecture boundaries.
+TanStack Router provides type-safe file-based routing, TanStack Query owns API state, and React Hook
+Form owns form interaction state. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the feature-first
+Hexagonal Architecture boundaries.
 
 ## Commands
 

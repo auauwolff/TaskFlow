@@ -1,16 +1,17 @@
 import { mutationOptions, queryOptions } from '@tanstack/react-query'
-import type { UserId } from '@/features/session/domain/user'
+import { authenticatedQueryMeta } from '@/shared/query/authenticatedQueries'
 import type { CreateProjectInput, ProjectsGateway } from '../application/ports'
 
 export const projectKeys = {
   all: ['projects'] as const,
-  byOwner: (ownerId: UserId) => [...projectKeys.all, 'owner', ownerId] as const,
+  list: () => [...projectKeys.all, 'list'] as const,
 }
 
-export function projectsByOwnerOptions(gateway: ProjectsGateway, ownerId: UserId) {
+export function projectsOptions(gateway: ProjectsGateway) {
   return queryOptions({
-    queryKey: projectKeys.byOwner(ownerId),
+    queryKey: projectKeys.list(),
     queryFn: ({ signal }) => gateway.list(signal),
+    meta: authenticatedQueryMeta,
   })
 }
 

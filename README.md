@@ -15,7 +15,7 @@ point is the _architecture_, not the features.
 - **FluentValidation**, **Serilog**, **OpenAPI/Swagger**
 - **OpenID Connect** + ASP.NET secure cookie BFF authentication
 - **xUnit** + **NSubstitute** + **FluentAssertions**
-- **React 19** + **Vite** + **TypeScript** + **TanStack Router/Query** + **XState** (pnpm)
+- **React 19** + **Vite** + **TypeScript** + **TanStack Router/Query** + **React Hook Form** (pnpm)
 
 ## Architecture — the dependency rule
 

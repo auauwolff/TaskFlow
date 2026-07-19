@@ -40,7 +40,7 @@ The app (a task/project manager) is intentionally trivial. **The architecture is
 | Logging | Serilog | Phase 4. |
 | API docs | `Microsoft.AspNetCore.OpenApi` (+ Swagger UI later) | .NET 10 dropped Swashbuckle from the template. |
 | Tests | xUnit + NSubstitute + FluentAssertions | Phase 5. |
-| Frontend | React 19 + Vite + TypeScript + TanStack Router/Query + XState (pnpm) | Feature-first Hexagonal Architecture; ASP.NET remains the single backend. |
+| Frontend | React 19 + Vite + TypeScript + TanStack Router/Query + React Hook Form (pnpm) | Feature-first Hexagonal Architecture; ASP.NET remains the single backend. |
 | Authentication | Generic OIDC + ASP.NET `HttpOnly` cookie BFF; Keycloak locally | Provider details remain in the API adapter/configuration; TaskFlow uses its own internal user ID. |
 | Solution file | **`.slnx`** (new XML format) | .NET 10 default. |
 
@@ -94,13 +94,20 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
   flow owned by ASP.NET. React calls stable TaskFlow login/me/logout endpoints and never sees a
   provider SDK, access token, client secret, issuer, or subject.
 - Added the frontend `AuthenticationGateway` port and HTTP adapter. The composition root now selects
-  that adapter; the session service and XState machine model restore/sign-in/sign-out without caring
-  which provider implements OIDC.
+  that adapter; the session service models restore/sign-in/sign-out without caring which provider
+  implements OIDC. TanStack Query shares the restored user as server state.
 - Clarified the frontend object model: stateful antiforgery/authentication/project adapters and the
   session application service are constructor-injected classes implementing narrow contracts;
   `createAppRuntime()` remains the functional manual composition root, while React, mappings, and
-  Query/XState configuration remain functional. Focused contexts expose dependencies, not a generic
+  Query configuration remain functional. Focused contexts expose dependencies, not a generic
   API service or service locator.
+- Replaced the session state machine with a focused Query-backed session adapter. A pathless
+  authenticated route now owns restore/error/sign-in rendering and workspace identity, so feature
+  pages no longer receive session props. Anonymous transitions centrally remove authenticated cache
+  entries while retaining the cached session result.
+- Removed the unused owner ID from project query APIs because ownership is derived by ASP.NET. Split
+  project listing and creation into focused hooks, and moved project form values and validation to
+  React Hook Form instead of manually controlled fields.
 - Added `ExternalIdentity` plus a unique `(issuer, subject)` mapping to an internal TaskFlow `User`.
   First login provisions a user; later logins retain the TaskFlow ID and refresh profile data. Email
   remains profile data and is not the authentication key. A verified provider email may safely link
@@ -120,7 +127,7 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
   a server-owned project through Vite, reject a tokenless write with 400, then complete local and
   provider logout (`/api/auth/me`: 200 → 401; the next login requires credentials again).
 - Verification: strict backend build passed with 48/48 tests; frontend lint, dependency rules,
-  production build, and 10/10 tests passed; NuGet and pnpm reported no known vulnerabilities.
+  production build, and 8/8 tests passed; NuGet and pnpm reported no known vulnerabilities.
 - Supersedes Phase 6b's temporary `UsersGateway`/`CurrentUserStorage` development identity. The
   original entry remains below as the learning history that motivated the authentication boundary.
 - **Next:** integrate task Query/view models, fix string-enum representation in generated OpenAPI,

@@ -1,10 +1,8 @@
-interface SignInPageProps {
-  error: string | null
-  isSigningIn: boolean
-  onSignIn(): void
-}
+import { useSignIn } from './useSession'
 
-export function SignInPage({ error, isSigningIn, onSignIn }: SignInPageProps) {
+export function SignInPage() {
+  const { error, isSigningIn, signIn } = useSignIn()
+
   return (
     <main className="onboarding page-frame">
       <section className="intro-panel">
@@ -35,7 +33,7 @@ export function SignInPage({ error, isSigningIn, onSignIn }: SignInPageProps) {
           className="primary-button"
           type="button"
           disabled={isSigningIn}
-          onClick={onSignIn}
+          onClick={() => signIn('/')}
         >
           {isSigningIn ? 'Redirecting...' : 'Sign in securely'}
         </button>

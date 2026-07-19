@@ -31,7 +31,7 @@ focused providers; it is not a service locator and feature code never receives t
 - Ports remain TypeScript interfaces.
 - Stateful HTTP adapters and application services are constructor-injected classes implementing
   those interfaces.
-- React components, hooks, composition factories, Query/XState configuration, DTO mappings, and pure
+- React components, hooks, composition factories, Query configuration, DTO mappings, and pure
   domain operations remain functions.
 - A class is introduced for meaningful dependency ownership, state, identity, or lifecycle, not just
   because code lives outside React.
@@ -48,15 +48,22 @@ live in `.dependency-cruiser.cjs`, making the dependency rule executable rather 
 | State | Owner |
 | --- | --- |
 | Projects and tasks returned by the API | TanStack Query |
-| Authentication workflow and current user | XState session actor |
+| Current authenticated user | TanStack Query session cache |
 | OIDC protocol, tokens, and session cookie | ASP.NET authentication adapter |
 | Selected resource and shareable filters | Router path/search parameters |
-| Form values and local interaction state | React |
+| Form values and validation | React Hook Form |
+| Other local interaction state | React |
 | Stable gateways and services | `AppRuntime` through focused dependency contexts |
 
-Server data is never copied into a second global client store. XState models workflows, not the
-API cache. React Context distributes stable dependencies and the session actor, not frequently
-changing feature data. Crossing into the anonymous session state clears authenticated Query data.
+Server data is never copied into a second global client store. The current user and feature data are
+shared through focused Query hooks backed by one `QueryClient`; repeated consumers subscribe to the
+same cached data rather than issuing independent requests. React Context distributes stable injected
+services, not frequently changing feature data. Crossing into an anonymous session clears
+authenticated Query data while preserving the session query.
+
+A pathless authenticated route owns session loading, failure, anonymous, and ready rendering. Child
+pages do not receive session props. Shared authenticated chrome reads the cached session at the route
+boundary, and future authenticated routes inherit the same guard.
 
 ## Transport boundary
 
@@ -66,7 +73,7 @@ frontend models and `AppError`; components do not import generated schemas or ca
 
 Authentication follows the same boundary. The session application layer depends on an
 `AuthenticationGateway`; its HTTP adapter calls stable TaskFlow endpoints (`/api/auth/me`, login,
-antiforgery, and logout). React and XState never import a provider SDK. ASP.NET owns the OIDC
+antiforgery, and logout). React and Query never import a provider SDK. ASP.NET owns the OIDC
 protocol and an `HttpOnly` same-origin cookie, so replacing Keycloak with another OIDC provider does
 not change frontend features.
 
@@ -78,10 +85,10 @@ pnpm generate:api
 
 ## Replaceability
 
-Components consume feature-owned view models rather than TanStack Query result objects. Replacing
-Query therefore changes presentation adapters, not page components or application ports. Replacing
-React requires a new presentation adapter, while domain models, ports, HTTP adapters, and
-core XState machines remain reusable.
+Components consume focused feature hooks rather than raw TanStack Query result objects. Replacing
+Query therefore changes presentation adapters, not application ports or HTTP adapters. Replacing
+React requires a new presentation adapter, while domain models, ports, HTTP adapters, and application
+services remain reusable.
 
 Do not build a generic wrapper around every Query feature. Abstract feature intent (`ProjectsGateway`,
-`useProjectsPageModel`) rather than recreating a universal cache API.
+`useProjects`, `useCreateProject`) rather than recreating a universal cache API.

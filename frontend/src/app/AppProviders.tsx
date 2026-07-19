@@ -1,7 +1,9 @@
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { useEffect, type PropsWithChildren } from 'react'
 import { ProjectsGatewayContext } from '@/features/projects/presentation/projectsGatewayContext'
-import { SessionActorContext } from '@/features/session/presentation/sessionContext'
+import { SessionServiceContext } from '@/features/session/presentation/sessionContext'
+import { useSession } from '@/features/session/presentation/useSession'
+import { removeAuthenticatedQueries } from '@/shared/query/authenticatedQueries'
 import type { AppRuntime } from './composition'
 
 interface AppProvidersProps extends PropsWithChildren {
@@ -12,9 +14,9 @@ export function AppProviders({ runtime, children }: AppProvidersProps) {
   return (
     <ProjectsGatewayContext value={runtime.projects}>
       <QueryClientProvider client={runtime.queryClient}>
-        <SessionActorContext.Provider logic={runtime.sessionLogic}>
+        <SessionServiceContext value={runtime.session}>
           <AuthenticatedCacheBoundary>{children}</AuthenticatedCacheBoundary>
-        </SessionActorContext.Provider>
+        </SessionServiceContext>
       </QueryClientProvider>
     </ProjectsGatewayContext>
   )
@@ -22,13 +24,13 @@ export function AppProviders({ runtime, children }: AppProvidersProps) {
 
 function AuthenticatedCacheBoundary({ children }: PropsWithChildren) {
   const queryClient = useQueryClient()
-  const isAnonymous = SessionActorContext.useSelector((snapshot) =>
-    snapshot.matches('anonymous'),
-  )
+  const session = useSession()
 
   useEffect(() => {
-    if (isAnonymous) queryClient.clear()
-  }, [isAnonymous, queryClient])
+    if (session.status !== 'anonymous') return
+
+    removeAuthenticatedQueries(queryClient)
+  }, [queryClient, session.status])
 
   return children
 }

@@ -1,50 +1,71 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { errorMessage } from '@/shared/errors/appError'
+import { removeAuthenticatedQueries } from '@/shared/query/authenticatedQueries'
 import type { User } from '../domain/user'
-import { SessionActorContext } from './sessionContext'
+import { useSessionService } from './sessionContext'
+import { currentSessionOptions, sessionKeys } from './sessionQueries'
 
 export type SessionViewModel =
   | { status: 'loading' }
-  | {
-      status: 'anonymous'
-      error: string | null
-      isSigningIn: boolean
-      signIn(): void
-    }
+  | { status: 'anonymous' }
   | { status: 'failed'; message: string; retry(): void }
-  | { status: 'ready'; user: User; error: string | null; signOut(): void }
+  | { status: 'ready'; user: User }
 
 export function useSession(): SessionViewModel {
-  const actor = SessionActorContext.useActorRef()
-  const snapshot = SessionActorContext.useSelector((value) => value)
+  const service = useSessionService()
+  const session = useQuery(currentSessionOptions(service))
 
-  if (snapshot.matches('anonymous') || snapshot.matches('signingIn')) {
-    return {
-      status: 'anonymous',
-      error: snapshot.context.error === null ? null : errorMessage(snapshot.context.error),
-      isSigningIn: snapshot.matches('signingIn'),
-      signIn: () => actor.send({ type: 'session.sign-in', returnUrl: '/' }),
-    }
-  }
+  if (session.isPending) return { status: 'loading' }
 
-  if (snapshot.matches('failed')) {
+  if (session.isError) {
     return {
       status: 'failed',
-      message: errorMessage(snapshot.context.error),
-      retry: () => actor.send({ type: 'session.retry' }),
+      message: errorMessage(session.error),
+      retry: () => void session.refetch(),
     }
   }
 
-  if (
-    (snapshot.matches('ready') || snapshot.matches('signingOut')) &&
-    snapshot.context.user !== null
-  ) {
-    return {
-      status: 'ready',
-      user: snapshot.context.user,
-      error: snapshot.context.error === null ? null : errorMessage(snapshot.context.error),
-      signOut: () => actor.send({ type: 'session.sign-out' }),
-    }
-  }
+  if (session.data === null) return { status: 'anonymous' }
 
-  return { status: 'loading' }
+  return { status: 'ready', user: session.data }
+}
+
+export function useCurrentUser(): User {
+  const session = useSession()
+
+  if (session.status !== 'ready')
+    throw new Error('useCurrentUser must be used inside an authenticated route.')
+
+  return session.user
+}
+
+export function useSignIn() {
+  const service = useSessionService()
+  const signIn = useMutation({
+    mutationFn: (returnUrl: string) => service.signIn(returnUrl),
+  })
+
+  return {
+    error: signIn.error === null ? null : errorMessage(signIn.error),
+    isSigningIn: signIn.isPending,
+    signIn: (returnUrl = '/') => signIn.mutate(returnUrl),
+  }
+}
+
+export function useSignOut() {
+  const service = useSessionService()
+  const queryClient = useQueryClient()
+  const signOut = useMutation({
+    mutationFn: () => service.signOut(),
+    onSuccess: () => {
+      removeAuthenticatedQueries(queryClient)
+      queryClient.setQueryData(sessionKeys.current(), null)
+    },
+  })
+
+  return {
+    error: signOut.error === null ? null : errorMessage(signOut.error),
+    isSigningOut: signOut.isPending,
+    signOut: () => signOut.mutate(),
+  }
 }
