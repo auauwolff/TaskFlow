@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { errorMessage } from '@/shared/errors/appError'
 import { transitionToAnonymousSession } from '../current-session/sessionCache'
-import { useSessionService } from '../sessionContext'
+import { useSessionService } from '../sessionService'
 
 export function useSignOut() {
   const service = useSessionService()

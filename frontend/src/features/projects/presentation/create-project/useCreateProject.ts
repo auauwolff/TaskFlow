@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { errorMessage } from '@/shared/errors/appError'
 import { projectKeys } from '../projectKeys'
-import { useProjectsGateway } from '../projectsGatewayContext'
+import { useProjectsGateway } from '../projectsGatewayService'
 import { createProjectOptions } from './projectMutations'
 
 export interface CreateProjectDraft {

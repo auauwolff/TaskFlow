@@ -1,9 +1,8 @@
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { useEffect, type PropsWithChildren } from 'react'
-import { ProjectsGatewayContext } from '@/features/projects/presentation/projectsGatewayContext'
 import { transitionToAnonymousSession } from '@/features/session/presentation/current-session/sessionCache'
 import { useSession } from '@/features/session/presentation/current-session/useSession'
-import { SessionServiceContext } from '@/features/session/presentation/sessionContext'
+import { ServiceProvider } from '@/shared/ioc/react'
 import type { AppRuntime } from './composition'
 
 interface AppProvidersProps extends PropsWithChildren {
@@ -12,13 +11,11 @@ interface AppProvidersProps extends PropsWithChildren {
 
 export function AppProviders({ runtime, children }: AppProvidersProps) {
   return (
-    <ProjectsGatewayContext value={runtime.projects}>
+    <ServiceProvider services={runtime.services}>
       <QueryClientProvider client={runtime.queryClient}>
-        <SessionServiceContext value={runtime.session}>
-          <AuthenticatedCacheBoundary>{children}</AuthenticatedCacheBoundary>
-        </SessionServiceContext>
+        <AuthenticatedCacheBoundary>{children}</AuthenticatedCacheBoundary>
       </QueryClientProvider>
-    </ProjectsGatewayContext>
+    </ServiceProvider>
   )
 }
 

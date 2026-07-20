@@ -1,4 +1,4 @@
-import type { Project } from '../domain/project'
+import type { Project, ProjectId } from '../domain/project'
 
 export interface CreateProjectInput {
   name: string
@@ -7,5 +7,6 @@ export interface CreateProjectInput {
 
 export interface ProjectsGateway {
   list(signal?: AbortSignal): Promise<Project[]>
+  get(id: ProjectId, signal?: AbortSignal): Promise<Project>
   create(input: CreateProjectInput, signal?: AbortSignal): Promise<Project>
 }

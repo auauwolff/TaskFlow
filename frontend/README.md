@@ -51,4 +51,5 @@ migrations, starts the API on `15131` and Vite on `15173`, and removes the conta
 does not use or delete the normal development volumes and can run beside the development stack.
 
 Use `pnpm test:e2e:ui` for Playwright UI mode. Browser tests live in `e2e/`; they verify public user
-journeys and must not import application implementation code.
+journeys, including deep-linked project/task workflows, and must not import application implementation
+code.

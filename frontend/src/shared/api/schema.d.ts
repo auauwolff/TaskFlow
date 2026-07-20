@@ -304,8 +304,8 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: {
-                    projectId?: string;
+                query: {
+                    projectId: string;
                 };
                 header?: never;
                 path?: never;
@@ -322,6 +322,28 @@ export interface paths {
                         "text/plain": components["schemas"]["TaskItemDto"][];
                         "application/json": components["schemas"]["TaskItemDto"][];
                         "text/json": components["schemas"]["TaskItemDto"][];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ValidationProblemDetails"];
+                        "application/json": components["schemas"]["ValidationProblemDetails"];
+                        "text/json": components["schemas"]["ValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
                     };
                 };
             };
@@ -606,8 +628,10 @@ export interface components {
             /** Format: date-time */
             completedAt: null | string;
         };
-        TaskItemStatus: number;
-        TaskPriority: number;
+        /** @enum {string} */
+        TaskItemStatus: "Todo" | "InProgress" | "Done";
+        /** @enum {string} */
+        TaskPriority: "Low" | "Medium" | "High";
         UserDto: {
             /** Format: uuid */
             id: string;

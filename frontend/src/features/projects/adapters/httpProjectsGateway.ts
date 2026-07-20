@@ -5,7 +5,7 @@ import type { ApiClient } from '@/shared/api/client'
 import type { components } from '@/shared/api/schema'
 import { AppError } from '@/shared/errors/appError'
 import type { CreateProjectInput, ProjectsGateway } from '../application/ports'
-import { projectId, type Project } from '../domain/project'
+import { projectId, type Project, type ProjectId } from '../domain/project'
 
 type ProjectDto = components['schemas']['ProjectDto']
 
@@ -25,6 +25,20 @@ export class HttpProjectsGateway implements ProjectsGateway {
       })
 
       if (data !== undefined) return data.map(toProject)
+      throw apiError(response, error)
+    } catch (error) {
+      throw networkError(error)
+    }
+  }
+
+  async get(id: ProjectId, signal?: AbortSignal): Promise<Project> {
+    try {
+      const { data, error, response } = await this.client.GET('/api/projects/{id}', {
+        params: { path: { id } },
+        signal,
+      })
+
+      if (data !== undefined) return toProject(data)
       throw apiError(response, error)
     } catch (error) {
       throw networkError(error)

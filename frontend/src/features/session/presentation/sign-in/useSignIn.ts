@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { errorMessage } from '@/shared/errors/appError'
-import { useSessionService } from '../sessionContext'
+import { useSessionService } from '../sessionService'
 
 export function useSignIn() {
   const service = useSessionService()

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using TaskFlow.Application.Tasks;
 
 namespace TaskFlow.Api.Controllers;
@@ -29,8 +30,10 @@ public sealed class TasksController(ITaskService tasks) : ControllerBase
 
     [HttpGet]
     [ProducesResponseType<IReadOnlyList<TaskItemDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IReadOnlyList<TaskItemDto>>> ListByProject(
-        [FromQuery] Guid projectId,
+        [FromQuery, BindRequired] Guid projectId,
         CancellationToken cancellationToken) =>
         Ok(await tasks.ListByProjectAsync(projectId, cancellationToken));
 

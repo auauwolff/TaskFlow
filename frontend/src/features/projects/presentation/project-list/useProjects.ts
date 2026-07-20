@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { errorMessage } from '@/shared/errors/appError'
 import type { ProjectId } from '../../domain/project'
-import { useProjectsGateway } from '../projectsGatewayContext'
+import { useProjectsGateway } from '../projectsGatewayService'
 import { projectsOptions } from './projectQueries'
 
 export interface ProjectListItem {

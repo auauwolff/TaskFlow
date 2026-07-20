@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { errorMessage } from '@/shared/errors/appError'
 import type { User } from '../../domain/user'
-import { useSessionService } from '../sessionContext'
+import { useSessionService } from '../sessionService'
 import { currentSessionOptions } from './sessionQueries'
 
 export type SessionViewModel =

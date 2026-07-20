@@ -9,11 +9,26 @@ state ownership rather than feature volume.
 
 ## Status
 
-The backend, OIDC authentication, authenticated project vertical slice, and isolated browser journeys
-are implemented. Task UI and production containers remain on the roadmap. See
-[`PROGRESS.md`](PROGRESS.md) for the learning journal and detailed implementation history.
+The backend, OIDC authentication, project/task workflows, deep-linkable project workspaces, and
+isolated browser journeys are implemented. Production containers and richer task transitions remain
+on the roadmap. See [`PROGRESS.md`](PROGRESS.md) for the learning journal and implementation history.
 
 ## Architecture
+
+### Interactive Explorer
+
+The frontend includes an Nx-style system explorer. Start the application frontend:
+
+```bash
+pnpm --dir frontend dev
+```
+
+Then open <http://localhost:5173/architecture>. Start from the complete full-stack map, select any
+node to isolate its dependencies and consumers, then drill from frontend/backend projects into layers,
+modules, dependency-injection wiring, and concrete source files.
+Dedicated sign-in and task-request lenses animate the important end-to-end paths. Source links in the
+inspector connect conceptual nodes back to their implementation. See
+[`frontend/ARCHITECTURE-EXPLORER.md`](frontend/ARCHITECTURE-EXPLORER.md) for the interaction guide.
 
 ```mermaid
 flowchart LR
@@ -175,5 +190,5 @@ investigation but become noisy, so they are supplemental rather than the primary
 ## Next Steps
 
 - Run the Playwright journeys in CI with browser and Docker support.
-- Implement the task vertical slice after correcting task enum representation in generated OpenAPI.
+- Expose start/reopen task transitions when the UI needs a fuller workflow.
 - Add API/frontend containers and a production reverse proxy.

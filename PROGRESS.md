@@ -50,8 +50,8 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 ## 📍 Current status
 
 - **Done:** Phase 0 ✅, Phase 1 ✅, Phase 2 ✅, Phase 3 ✅, Phase 4 ✅, Phase 5 ✅
-- **In progress:** Phase 6 — provider-neutral authentication and user/project integration complete;
-  tasks and full-stack application containers next.
+- **In progress:** Phase 6 — provider-neutral authentication plus project/task workflows complete;
+  CI and full-stack application containers next.
 - **Last updated:** 2026-07-19
 
 ## 🗺️ Roadmap & checklist
@@ -88,6 +88,27 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 4. Tell Claude "continue with Phase N" (or `/loop`-style: "pick up where PROGRESS.md says").
 
 ## 📓 Session log
+
+### 2026-07-19 — Phase 6d 🚧 URL-owned project workspaces + task vertical slice
+- Corrected first-party .NET OpenAPI enum metadata so generated TypeScript now represents task status
+  and priority as string unions matching runtime JSON. The task-list `projectId` is now explicitly
+  required in the published contract.
+- Added `/projects/$projectId` as the owner of project selection. Deep links, reload, back/forward, and
+  copied URLs restore the selected workspace without duplicating selection in Context or local state.
+- Extended the project gateway with project detail loading. The route composes the project and task
+  features, and tasks render only after the selected owned project resolves.
+- Added the task frontend hexagon: domain model, application port, generated-contract HTTP adapter,
+  focused dependency Context, project-scoped Query keys, React Hook Form creation, completion, and
+  assign-to-current-user mutations.
+- Kept state ownership explicit: Router owns selection, Query owns projects/tasks/session and mutation
+  state, React Hook Form owns task drafts, and Context exposes only stable gateways.
+- Added isolated Playwright infrastructure with disposable PostgreSQL and Keycloak services on E2E-only
+  ports. Browser journeys now cover OIDC login, project creation, task validation/create/assign/complete,
+  deep-link persistence, navigation, and provider logout without touching development volumes.
+- Verification: strict backend build passed, 48/48 backend tests passed, frontend lint and dependency
+  rules passed, 20/20 Vitest tests passed, production build passed, and 4/4 Playwright journeys passed.
+- **Next:** add CI quality gates, root error/not-found UI, server field-error mapping, and production
+  API/frontend containers with a trusted reverse proxy.
 
 ### 2026-07-19 — Phase 6c 🚧 Provider-neutral OIDC authentication
 - Replaced the browser-selected development identity with a real OIDC authorization-code + PKCE

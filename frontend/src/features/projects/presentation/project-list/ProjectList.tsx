@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { useProjects } from './useProjects'
 
 export function ProjectList() {
@@ -28,7 +29,11 @@ export function ProjectList() {
             <li key={project.id}>
               <span className="project-index">{String(index + 1).padStart(2, '0')}</span>
               <div>
-                <h3>{project.name}</h3>
+                <h3>
+                  <Link to="/projects/$projectId" params={{ projectId: project.id }}>
+                    {project.name}
+                  </Link>
+                </h3>
                 <p>{project.description ?? 'No description'}</p>
               </div>
               <time>{project.createdLabel}</time>

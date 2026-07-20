@@ -1,31 +1,36 @@
 import { QueryClient } from '@tanstack/react-query'
-import type { ProjectsGateway } from '@/features/projects/application/ports'
-import { HttpProjectsGateway } from '@/features/projects/adapters/httpProjectsGateway'
-import { HttpAuthenticationGateway } from '@/features/session/adapters/httpAuthenticationGateway'
-import { SessionService, type SessionUseCases } from '@/features/session/application/sessionService'
+import { addProjectsModule } from '@/features/projects/composition'
+import { addSessionModule } from '@/features/session/composition'
 import { transitionToAnonymousSession } from '@/features/session/presentation/current-session/sessionCache'
+import { addTasksModule } from '@/features/tasks/composition'
+import { antiforgeryClientToken, apiClientToken } from '@/shared/api/apiServices'
 import { createApiClient } from '@/shared/api/client'
 import { HttpAntiforgeryClient } from '@/shared/api/antiforgery'
 import { AppError } from '@/shared/errors/appError'
+import { ServiceCollection, type ServiceScopeResolver } from '@/shared/ioc/core'
 
 export interface AppRuntime {
   queryClient: QueryClient
-  projects: ProjectsGateway
-  session: SessionUseCases
+  services: ServiceScopeResolver
 }
 
 export function createAppRuntime(): AppRuntime {
   const queryClient = createQueryClient()
-  const apiClient = createApiClient(() => transitionToAnonymousSession(queryClient))
-  const antiforgery = new HttpAntiforgeryClient(apiClient)
-  const authentication = new HttpAuthenticationGateway(apiClient, antiforgery)
-  const projects = new HttpProjectsGateway(apiClient, antiforgery)
-  const session = new SessionService(authentication)
+  const registrations = new ServiceCollection()
+    .singleton(apiClientToken, () =>
+      createApiClient(() => transitionToAnonymousSession(queryClient)))
+    .singleton(antiforgeryClientToken, dependencies =>
+      new HttpAntiforgeryClient(dependencies.get(apiClientToken)))
+
+  addSessionModule(registrations)
+  addProjectsModule(registrations)
+  addTasksModule(registrations)
+
+  const services = registrations.build()
 
   return {
     queryClient,
-    projects,
-    session,
+    services,
   }
 }
 
