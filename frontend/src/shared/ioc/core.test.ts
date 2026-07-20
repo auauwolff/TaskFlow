@@ -114,3 +114,81 @@ describe('ServiceCollection', () => {
       .toThrow("Singleton service 'Singleton' cannot depend on scoped service 'Scoped'.")
   })
 })
+
+describe('ServiceContainer disposal', () => {
+  it('disposes scoped instances created within the scope', () => {
+    const token = createServiceToken<{ disposed: boolean; dispose(): void }>('Resource')
+    const root = new ServiceCollection()
+      .scoped(token, () => ({ disposed: false, dispose() { this.disposed = true } }))
+      .build()
+    const scope = root.createScope()
+    const resource = scope.get(token)
+
+    scope.dispose()
+
+    expect(resource.disposed).toBe(true)
+    expect(scope.isDisposed()).toBe(true)
+  })
+
+  it('does not dispose parent singletons when a child scope is disposed', () => {
+    const token = createServiceToken<{ dispose: () => void }>('Singleton')
+    const dispose = vi.fn()
+    const root = new ServiceCollection().singleton(token, () => ({ dispose })).build()
+    const scope = root.createScope()
+    scope.get(token)
+
+    scope.dispose()
+
+    expect(dispose).not.toHaveBeenCalled()
+  })
+
+  it('disposes in reverse creation order so consumers release before dependencies', () => {
+    const order: string[] = []
+    const dependency = createServiceToken<{ dispose(): void }>('Dependency')
+    const consumer = createServiceToken<{ dispose(): void }>('Consumer')
+    const root = new ServiceCollection()
+      .scoped(dependency, () => ({ dispose: () => order.push('dependency') }))
+      .scoped(consumer, services => {
+        services.get(dependency)
+        return { dispose: () => order.push('consumer') }
+      })
+      .build()
+    const scope = root.createScope()
+    scope.get(consumer)
+
+    scope.dispose()
+
+    expect(order).toEqual(['consumer', 'dependency'])
+  })
+
+  it('is idempotent', () => {
+    const token = createServiceToken<{ dispose: () => void }>('Resource')
+    const dispose = vi.fn()
+    const scope = new ServiceCollection().scoped(token, () => ({ dispose })).build().createScope()
+    scope.get(token)
+
+    scope.dispose()
+    scope.dispose()
+
+    expect(dispose).toHaveBeenCalledOnce()
+  })
+
+  it('rejects resolution after disposal', () => {
+    const token = createServiceToken<string>('Message')
+    const scope = new ServiceCollection().value(token, 'hi').build().createScope()
+    scope.dispose()
+
+    expect(() => scope.get(token)).toThrow('This service scope has been disposed.')
+  })
+
+  it('never retains or disposes transient instances', () => {
+    const token = createServiceToken<{ dispose: () => void }>('Transient')
+    const dispose = vi.fn()
+    const scope = new ServiceCollection().transient(token, () => ({ dispose })).build().createScope()
+    scope.get(token)
+
+    scope.dispose()
+
+    expect(dispose).not.toHaveBeenCalled()
+  })
+})

@@ -3,6 +3,7 @@ import { errorMessage } from '@/shared/errors/appError'
 import type { Project } from '../../domain/project'
 import { useProjectsGateway } from '../projectsGatewayService'
 import { projectOptions } from './projectQueries'
+import { useProjectWorkspace } from './projectWorkspaceService'
 
 export type ProjectModel =
   | { status: 'loading' }
@@ -11,7 +12,8 @@ export type ProjectModel =
 
 export function useProject(id: Project['id']): ProjectModel {
   const gateway = useProjectsGateway()
-  const project = useQuery(projectOptions(gateway, id))
+  const workspace = useProjectWorkspace()
+  const project = useQuery(projectOptions(gateway, id, workspace.signal))
 
   if (project.isPending) return { status: 'loading' }
   if (project.isError)

@@ -14,10 +14,22 @@ export interface StableServiceResolver extends ServiceResolver {
   getStable<T>(token: ServiceToken<T>): T
 }
 
+/**
+ * A service that owns a resource (subscription, AbortController, timer) which must be released
+ * when its container is torn down. Singleton and scoped instances implementing this are disposed
+ * automatically when their owning container is disposed; transient instances are the caller's to
+ * dispose because the container does not retain them.
+ */
+export interface Disposable {
+  dispose(): void
+}
+
 export type ConfigureServices = (services: ServiceCollection) => void
 
 export interface ServiceScopeResolver extends StableServiceResolver {
   createScope(configure?: ConfigureServices): ServiceScopeResolver
+  dispose(): void
+  isDisposed(): boolean
 }
 
 export type ServiceFactory<T> = (services: ServiceResolver) => T
@@ -49,6 +61,15 @@ export function createServiceToken<T>(name: string): ServiceToken<T> {
     name: normalizedName,
     [serviceType]: (value: T) => value,
   })
+}
+
+function isDisposable(value: unknown): value is Disposable {
+  return (
+    typeof value === 'object'
+    && value !== null
+    && 'dispose' in value
+    && typeof (value as { dispose: unknown }).dispose === 'function'
+  )
 }
 
 export class ServiceCollection {
@@ -102,6 +123,8 @@ export class ServiceContainer implements ServiceScopeResolver {
   readonly #registrations: ReadonlyMap<symbol, Registration>
   readonly #scopedInstances = new Map<symbol, unknown>()
   readonly #singletonInstances = new Map<symbol, unknown>()
+  readonly #disposables: Disposable[] = []
+  #disposed = false
 
   constructor(
     registrations: ReadonlyMap<symbol, Registration>,
@@ -112,10 +135,12 @@ export class ServiceContainer implements ServiceScopeResolver {
   }
 
   get<T>(token: ServiceToken<T>): T {
+    this.throwIfDisposed()
     return this.resolve(token, [])
   }
 
   getStable<T>(token: ServiceToken<T>): T {
+    this.throwIfDisposed()
     const match = this.findRegistration(token)
     if (match === null) throw new Error(`Service '${token.name}' is not registered.`)
     if (match.registration.lifetime === 'transient')
@@ -131,9 +156,45 @@ export class ServiceContainer implements ServiceScopeResolver {
   }
 
   createScope(configure?: ConfigureServices): ServiceContainer {
+    this.throwIfDisposed()
     const services = new ServiceCollection()
     configure?.(services)
     return services.buildWithParent(this)
+  }
+
+  /**
+   * Releases every disposable instance this container created, in reverse creation order so a
+   * consumer is torn down before the dependency it was built from. A container only disposes its
+   * own instances: disposing a scope never touches the parent's singletons. Idempotent — a second
+   * call is a no-op, which keeps React Strict Mode's setup/cleanup/setup cycle safe.
+   */
+  dispose(): void {
+    if (this.#disposed) return
+    this.#disposed = true
+
+    const errors: unknown[] = []
+    for (let index = this.#disposables.length - 1; index >= 0; index--) {
+      try {
+        this.#disposables[index].dispose()
+      } catch (error) {
+        errors.push(error)
+      }
+    }
+
+    this.#disposables.length = 0
+    this.#scopedInstances.clear()
+    this.#singletonInstances.clear()
+
+    if (errors.length > 0)
+      throw new AggregateError(errors, 'One or more services failed to dispose.')
+  }
+
+  isDisposed(): boolean {
+    return this.#disposed
+  }
+
+  private throwIfDisposed(): void {
+    if (this.#disposed) throw new Error('This service scope has been disposed.')
   }
 
   initializeStableServices(): void {
@@ -185,6 +246,9 @@ export class ServiceContainer implements ServiceScopeResolver {
 
     const instance = this.create<T>(registration, stack)
     instances.set(token.key, instance)
+    // Retained singleton and scoped instances are disposed with this container. Transients skip
+    // resolveCached, so the container never holds them and never disposes them.
+    if (isDisposable(instance)) this.#disposables.push(instance)
     return instance
   }
 

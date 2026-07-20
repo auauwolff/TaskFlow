@@ -1,5 +1,13 @@
 /* oxlint-disable react/only-export-components -- Package entry exports its provider and consumer hook. */
-import { createContext, use, useState, type Key, type PropsWithChildren } from 'react'
+import {
+  createContext,
+  use,
+  useEffect,
+  useRef,
+  useState,
+  type Key,
+  type PropsWithChildren,
+} from 'react'
 import type { ConfigureServices, ServiceScopeResolver, ServiceToken } from './core'
 
 const ServiceContext = createContext<ServiceScopeResolver | null>(null)
@@ -31,9 +39,26 @@ export function ServiceScopeProvider({
 
 function ServiceScope({ configure, children }: Omit<ServiceScopeProviderProps, 'scopeKey'>) {
   const parent = useRequiredServices()
-  const [services] = useState(() => parent.createScope(configure))
+  const [scope, setScope] = useState(() => parent.createScope(configure))
+  const scopeRef = useRef(scope)
+  scopeRef.current = scope
 
-  return <ServiceContext value={services}>{children}</ServiceContext>
+  // Dispose the scope, and everything it created, when this subtree unmounts. The effect deps are
+  // the stable inputs (a changing `scopeKey` remounts the whole component instead), so cleanup runs
+  // on real unmount rather than on every render. React Strict Mode runs setup/cleanup/setup on
+  // mount: the first cleanup disposes the scope, so the second setup rebuilds it, keeping the live
+  // tree rendering against a usable scope.
+  useEffect(() => {
+    if (scopeRef.current.isDisposed()) {
+      const rebuilt = parent.createScope(configure)
+      scopeRef.current = rebuilt
+      setScope(rebuilt)
+    }
+
+    return () => scopeRef.current.dispose()
+  }, [parent, configure])
+
+  return <ServiceContext value={scope}>{children}</ServiceContext>
 }
 
 export function useService<T>(token: ServiceToken<T>): T {
