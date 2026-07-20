@@ -35,6 +35,11 @@ test('uses the project URL to create, assign, complete, and restore a task', asy
   await expect(task).toContainText('done')
   await expect(task.getByRole('button', { name: `Complete task: ${taskTitle}` })).toHaveCount(0)
 
+  await page.getByRole('button', { name: 'open', exact: true }).click()
+  await expect(task).toHaveCount(0)
+  await page.getByRole('button', { name: 'completed', exact: true }).click()
+  await expect(task).toBeVisible()
+
   const projectUrl = page.url()
   await page.reload()
   await expect(page).toHaveURL(projectUrl)

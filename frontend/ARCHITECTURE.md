@@ -8,7 +8,7 @@ application workflows independent from React, HTTP, identity providers, and serv
 ```text
 app/composition
       |
-      +-----------> presentation (React, Router, Query bindings)
+      +-----------> presentation (React, Router, Query/Apollo/MobX bindings)
       |                         |
       +-----------> adapters ---+---> application ports ---> domain
 ```
@@ -26,7 +26,7 @@ layers are avoided.
 
 `createAppRuntime()` is the application composition root. It registers shared infrastructure, invokes
 each feature's `add*Module()` function, and builds the object graph before React renders. `AppRuntime`
-contains the resulting immutable service resolver and Query client; feature code never receives the
+contains the resulting immutable service resolver, TanStack Query client, and Apollo client; feature code never receives the
 complete runtime or resolver.
 
 `shared/ioc` is a package-ready, framework-neutral typed container plus a thin React 19 bridge. Typed
@@ -38,8 +38,8 @@ React installs one `ServiceProvider`; focused feature hooks resolve only their o
 Container builds eagerly initialize singleton and scoped instances before their resolver is provided
 to React. `useService()` is therefore a pure stable read and rejects transient tokens; transient
 services are for explicit resolution and construction graphs outside render. Service constructors
-must remain side-effect-free. React Effects own subscriptions and other UI-tree resource lifecycles;
-automatic container disposal is intentionally not part of the current package boundary.
+must remain side-effect-free. Scopes dispose owned singleton/scoped resources in reverse construction
+order; React effects must start subscriptions because concurrent rendering may abandon constructors.
 
 The root `ServiceProvider` makes application singletons available to the complete UI tree. A route,
 page, or module that needs an isolated lifetime wraps its subtree in `ServiceScopeProvider`. The child
@@ -50,7 +50,7 @@ different workspace:
 ```tsx
 <ServiceScopeProvider
   scopeKey={projectId}
-  configure={addProjectWorkspaceScope}
+  configure={addTasksWorkspaceScope}
 >
   <ProjectWorkspacePage />
 </ServiceScopeProvider>
@@ -79,34 +79,35 @@ live in `.dependency-cruiser.cjs`, making the dependency rule executable rather 
 
 | State | Owner |
 | --- | --- |
-| Projects and tasks returned by the API | TanStack Query |
+| Projects returned by REST | TanStack Query |
+| Tasks returned by GraphQL | Apollo Client |
 | Current authenticated user | TanStack Query session cache |
 | OIDC protocol, tokens, and session cookie | ASP.NET authentication adapter |
 | Selected resource and shareable filters | Router path/search parameters |
 | Form values and validation | React Hook Form |
+| Project-scoped task filter | MobX view store |
 | Other local interaction state | React |
 | Stable gateways and services | Typed IoC registrations through focused feature hooks |
 
-Server data is never copied into a second global client store. The current user and feature data are
-shared through focused Query hooks backed by one `QueryClient`; repeated consumers subscribe to the
-same cached data rather than issuing independent requests. The IoC React bridge distributes one
-immutable service resolver, not frequently changing feature data. Crossing into an anonymous session
-clears authenticated Query data while preserving the session query.
+Server data is never copied between caches or into MobX. Session/projects use focused TanStack Query
+hooks; tasks use focused Apollo hooks and normalized GraphQL entities. Components consume TaskFlow-owned
+presentation models rather than either library's result objects. The IoC React bridge distributes one
+immutable resolver and scoped view stores, not server data. Crossing into an anonymous session clears
+authenticated Query data, the Apollo store, and the cached antiforgery token.
 
 When state must be shared across components, choose its owner by meaning rather than reach:
 
-1. Keep API-derived data in Query and let every consumer subscribe through a feature hook.
+1. Keep API-derived data in its feature's server-state engine and expose a focused feature hook.
 2. Put selected resources, filters, sorting, and other shareable state in Router path/search params.
 3. Keep form state in React Hook Form; use `FormProvider` only when one form spans a deep subtree.
 4. Lift transient interaction state to the nearest common component that needs it.
-5. Use a focused Context plus reducer for genuinely cross-tree client concerns such as theme or a
-   notification queue. Place the provider at the narrowest route or application boundary.
-6. Add a dedicated client-state library only after real, frequently changing, interconnected state
-   makes focused React ownership unwieldy. It must not duplicate Query or Router state.
+5. Use a scoped MobX view store for interconnected workspace interactions and computed UI state.
+6. Use a focused Context plus reducer for simple cross-tree concerns such as theme or notifications.
+7. A client store must not duplicate Query, Apollo, Router, or form state.
 
 New application complexity should come from real capabilities. Project selection, task filters, and
-task workflows naturally exercise URL, server, form, and local state without introducing a global
-store or artificial examples.
+task workflows naturally exercise URL, two server-state engines, form state, and a scoped MobX store
+without introducing a global application store.
 
 A pathless authenticated route owns session loading, failure, anonymous, and ready rendering. Child
 pages do not receive session props. Shared authenticated chrome reads the cached session at the route
@@ -115,16 +116,22 @@ boundary, and future authenticated routes inherit the same guard.
 ## Presentation organization
 
 As a feature grows, presentation code is grouped by UI capability rather than technical file type.
-Components, hooks, Query or mutation definitions, and tests that change together stay together in
+Components, hooks, server-state operations, and tests that change together stay together in
 folders such as `project-list` and `create-project`. Feature-wide page composition, cache keys,
 dependency tokens, and focused resolution hooks remain at the presentation root. Avoid broad
 `components`, `hooks`, `queries`, and `mutations` folders that scatter one capability across the tree.
 
 ## Transport boundary
 
-`openapi-typescript` generates `src/shared/api/schema.d.ts` from the running .NET API. Generated
+Projects and session use REST. `openapi-typescript` generates `src/shared/api/schema.d.ts`; generated
 transport types stay inside HTTP adapters. Adapters map transport DTOs and RFC Problem Details into
 frontend models and `AppError`; components do not import generated schemas or call `fetch`.
+
+Tasks deliberately use a second delivery path. Apollo posts typed task operations to `/api/graphql`,
+and Hot Chocolate resolvers delegate to the same backend `ITaskService` used by REST controllers.
+Task GraphQL enum, ID, and date values are mapped into the existing frontend task model at
+`features/tasks/presentation/taskGraphql.ts`. The same-origin cookie and antiforgery header protect
+both transports.
 
 Authentication follows the same boundary. The session application layer depends on an
 `AuthenticationGateway`; its HTTP adapter calls stable TaskFlow endpoints (`/api/auth/me`, login,
@@ -140,10 +147,11 @@ pnpm generate:api
 
 ## Replaceability
 
-Components consume focused feature hooks rather than raw TanStack Query result objects. Replacing
-Query therefore changes presentation adapters, not application ports or HTTP adapters. Replacing
-React requires a new presentation adapter, while domain models, ports, HTTP adapters, and application
-services remain reusable.
+Projects and tasks intentionally demonstrate different outer-layer choices. Project components are
+shielded from TanStack Query by focused hooks; task components are shielded from Apollo in the same
+way. Replacing either server-state engine changes that feature's presentation adapter and cache policy,
+not its component contract or domain model. Replacing REST with GraphQL changes the transport edge and
+backend delivery adapter while shared application services and domain behavior remain reusable.
 
-Do not build a generic wrapper around every Query feature. Abstract feature intent (`ProjectsGateway`,
-`useProjects`, `useCreateProject`) rather than recreating a universal cache API.
+Do not build a generic wrapper around Query, Apollo, or MobX. Abstract feature intent (`ProjectsGateway`,
+`useProjects`, `useTasks`, `TasksWorkspaceViewStore`) rather than recreating a universal cache API.

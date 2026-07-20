@@ -63,19 +63,20 @@ The frontend uses feature-first Hexagonal Architecture. A feature creates only t
 
 ```mermaid
 flowchart LR
-    Composition[app/composition] --> Presentation[presentation<br/>React, Router, Query]
-    Composition --> Adapters[adapters<br/>HTTP, browser APIs]
+    Composition[app/composition] --> Presentation[presentation<br/>React, Router, Query, Apollo, MobX]
+    Composition --> Adapters[adapters<br/>HTTP, GraphQL, browser APIs]
     Presentation --> Application[application<br/>use cases and ports]
     Adapters --> Application
     Application --> Domain[domain<br/>models and policies]
 ```
 
-- TanStack Query owns API and session state.
+- TanStack Query owns project and session server state; Apollo owns task server state.
+- A project-scoped MobX view store owns task-filter interaction state without copying server data.
 - TanStack Router owns shareable navigation state.
 - React Hook Form owns form values and validation.
-- Local React state owns transient interaction state.
-- Focused Context providers expose stable injected services, not changing server data.
-- HTTP adapters contain generated transport types and map them into application/domain models.
+- Local React state owns component-local transient interaction state.
+- The typed IoC provider exposes stable injected services and project-scoped stores, not server data.
+- REST and GraphQL boundaries map transport values into application/domain models.
 - Dependency Cruiser enforces layer direction and rejects circular imports.
 
 See [`frontend/ARCHITECTURE.md`](frontend/ARCHITECTURE.md) for the complete dependency and state
@@ -90,10 +91,10 @@ application dependency.
 
 ## Stack
 
-- .NET 10, ASP.NET Core controllers, EF Core, Npgsql, PostgreSQL
+- .NET 10, ASP.NET Core controllers and Hot Chocolate GraphQL, EF Core, Npgsql, PostgreSQL
 - OpenID Connect, secure cookie BFF, Keycloak for local development
 - FluentValidation, Problem Details, Serilog, OpenAPI/Swagger
-- React 19, TypeScript, Vite, TanStack Router and Query, React Hook Form
+- React 19, TypeScript, Vite, TanStack Router/Query, Apollo Client, MobX, React Hook Form
 - xUnit, NSubstitute, FluentAssertions, Vitest, Playwright, Dependency Cruiser, Oxlint
 
 ## Repository

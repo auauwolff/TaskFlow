@@ -2,19 +2,37 @@ import type { ProjectId } from '@/features/projects/domain/project'
 import { useCurrentUser } from '@/features/session/presentation/current-session/useSession'
 import { useAssignTask } from '../assign-task/useAssignTask'
 import { useCompleteTask } from '../complete-task/useCompleteTask'
+import { useTasksWorkspaceViewStore } from '../tasksWorkspaceViewStoreService'
 import { useTasks } from './useTasks'
 
-export function TaskList({ projectId }: { projectId: ProjectId }) {
+export const TaskList = observer(function TaskList({ projectId }: { projectId: ProjectId }) {
   const currentUser = useCurrentUser()
+  const workspace = useTasksWorkspaceViewStore()
   const tasks = useTasks(projectId)
   const completion = useCompleteTask(projectId)
   const assignment = useAssignTask(projectId)
+  const visibleTasks = tasks.status === 'ready'
+    ? tasks.tasks.filter(task => workspace.shows(task.status))
+    : []
 
   return (
     <section className="project-section" aria-live="polite">
       <div className="section-heading">
         <h2>Tasks</h2>
         {tasks.status === 'ready' ? <span>{tasks.tasks.length} total</span> : null}
+      </div>
+      <div className="inline-actions" aria-label="Filter tasks">
+        {(['all', 'open', 'completed'] as const).map(filter => (
+          <button
+            className="text-button"
+            type="button"
+            aria-pressed={workspace.filter === filter}
+            key={filter}
+            onClick={() => workspace.setFilter(filter)}
+          >
+            {filter}
+          </button>
+        ))}
       </div>
 
       {tasks.status === 'loading' ? <p className="muted-state">Loading tasks...</p> : null}
@@ -27,9 +45,12 @@ export function TaskList({ projectId }: { projectId: ProjectId }) {
       {tasks.status === 'ready' && tasks.tasks.length === 0 ? (
         <p className="muted-state">No tasks yet. Add the first one.</p>
       ) : null}
-      {tasks.status === 'ready' && tasks.tasks.length > 0 ? (
+      {tasks.status === 'ready' && tasks.tasks.length > 0 && visibleTasks.length === 0 ? (
+        <p className="muted-state">No tasks match this filter.</p>
+      ) : null}
+      {tasks.status === 'ready' && visibleTasks.length > 0 ? (
         <ol className="task-list">
-          {tasks.tasks.map((task, index) => (
+          {visibleTasks.map((task, index) => (
             <li className={task.status === 'done' ? 'task-item task-item-complete' : 'task-item'} key={task.id}>
               <span className="project-index">{String(index + 1).padStart(2, '0')}</span>
               <div className="task-content">
@@ -83,4 +104,5 @@ export function TaskList({ projectId }: { projectId: ProjectId }) {
       {assignment.error === null ? null : <p className="form-error" role="alert">{assignment.error}</p>}
     </section>
   )
-}
+})
+import { observer } from 'mobx-react-lite'

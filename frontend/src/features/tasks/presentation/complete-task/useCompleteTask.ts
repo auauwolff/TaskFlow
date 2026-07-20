@@ -1,24 +1,24 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@apollo/client/react'
+import { useState } from 'react'
 import type { ProjectId } from '@/features/projects/domain/project'
 import { errorMessage } from '@/shared/errors/appError'
 import type { TaskId } from '../../domain/task'
-import { taskKeys } from '../taskKeys'
-import { useTasksGateway } from '../tasksGatewayService'
-import { completeTaskOptions } from './taskMutations'
+import { COMPLETE_TASK_DOCUMENT, TASKS_DOCUMENT } from '../taskGraphql'
 
 export function useCompleteTask(projectId: ProjectId) {
-  const gateway = useTasksGateway()
-  const queryClient = useQueryClient()
-  const completion = useMutation({
-    ...completeTaskOptions(gateway),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId), exact: true })
-    },
-  })
+  const [completeTask, completion] = useMutation(COMPLETE_TASK_DOCUMENT)
+  const [completingId, setCompletingId] = useState<TaskId | null>(null)
 
   return {
-    complete: (id: TaskId) => completion.mutate(id),
-    error: completion.error === null ? null : errorMessage(completion.error),
-    completingId: completion.isPending ? completion.variables : null,
+    complete: (id: TaskId) => {
+      setCompletingId(id)
+      void completeTask({
+        variables: { id },
+        refetchQueries: [{ query: TASKS_DOCUMENT, variables: { projectId } }],
+        awaitRefetchQueries: true,
+      }).catch(() => undefined).finally(() => setCompletingId(null))
+    },
+    error: completion.error === undefined ? null : errorMessage(completion.error),
+    completingId,
   }
 }

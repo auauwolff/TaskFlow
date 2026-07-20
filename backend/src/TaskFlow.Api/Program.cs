@@ -8,6 +8,7 @@ using Microsoft.OpenApi;
 using Serilog;
 using TaskFlow.Api.Authentication;
 using TaskFlow.Api.ErrorHandling;
+using TaskFlow.Api.GraphQL;
 using TaskFlow.Application;
 using TaskFlow.Application.Common.Interfaces;
 using TaskFlow.Infrastructure;
@@ -38,6 +39,11 @@ builder.Services.AddProblemDetails(options =>
     options.CustomizeProblemDetails = context =>
         context.ProblemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier);
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services
+    .AddGraphQLServer()
+    .AddQueryType<TaskQueries>()
+    .AddMutationType<TaskMutations>()
+    .AddErrorFilter<TaskFlowGraphQLErrorFilter>();
 
 var oidc = builder.Configuration.GetSection("Authentication:Oidc");
 var authority = oidc["Authority"]
@@ -159,5 +165,7 @@ app.Use(async (context, next) =>
     await next(context);
 });
 app.MapControllers();
+app.MapGraphQL("/api/graphql")
+    .RequireAuthorization();
 
 app.Run();

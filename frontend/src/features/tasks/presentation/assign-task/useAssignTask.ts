@@ -1,25 +1,25 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@apollo/client/react'
+import { useState } from 'react'
 import type { ProjectId } from '@/features/projects/domain/project'
 import type { UserId } from '@/features/session/domain/user'
 import { errorMessage } from '@/shared/errors/appError'
 import type { TaskId } from '../../domain/task'
-import { taskKeys } from '../taskKeys'
-import { useTasksGateway } from '../tasksGatewayService'
-import { assignTaskOptions } from './taskMutations'
+import { ASSIGN_TASK_DOCUMENT, TASKS_DOCUMENT } from '../taskGraphql'
 
 export function useAssignTask(projectId: ProjectId) {
-  const gateway = useTasksGateway()
-  const queryClient = useQueryClient()
-  const assignment = useMutation({
-    ...assignTaskOptions(gateway),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId), exact: true })
-    },
-  })
+  const [assignTask, assignment] = useMutation(ASSIGN_TASK_DOCUMENT)
+  const [assigningId, setAssigningId] = useState<TaskId | null>(null)
 
   return {
-    assign: (id: TaskId, assigneeId: UserId) => assignment.mutate({ id, assigneeId }),
-    error: assignment.error === null ? null : errorMessage(assignment.error),
-    assigningId: assignment.isPending ? assignment.variables.id : null,
+    assign: (id: TaskId, assigneeId: UserId) => {
+      setAssigningId(id)
+      void assignTask({
+        variables: { id, input: { assigneeId } },
+        refetchQueries: [{ query: TASKS_DOCUMENT, variables: { projectId } }],
+        awaitRefetchQueries: true,
+      }).catch(() => undefined).finally(() => setAssigningId(null))
+    },
+    error: assignment.error === undefined ? null : errorMessage(assignment.error),
+    assigningId,
   }
 }
