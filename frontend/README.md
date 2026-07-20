@@ -36,6 +36,11 @@ pnpm generate:api
 Route files live in `src/routes`. The TanStack Router Vite plugin generates
 `src/routeTree.gen.ts`; do not edit that file manually.
 
+Stable application services are composed through the typed container in `src/shared/ioc`. The app
+composition root registers shared infrastructure and invokes feature-owned `add*Module()` functions;
+React receives the resulting graph through one service provider. See `ARCHITECTURE.md` for lifetime,
+token, nested `ServiceScopeProvider`, state-ownership, and dependency-boundary rules.
+
 ## Browser tests
 
 Playwright exercises the real browser, API, PostgreSQL database, and Keycloak login flow. Install its
