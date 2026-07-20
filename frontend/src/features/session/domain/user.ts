@@ -1,3 +1,5 @@
+import { guidIdentifier } from '@/shared/domain/identifier'
+
 declare const userIdBrand: unique symbol
 
 export type UserId = string & { readonly [userIdBrand]: true }
@@ -8,6 +10,4 @@ export interface User {
   email: string
 }
 
-export function userId(value: string): UserId {
-  return value as UserId
-}
+export const userId = guidIdentifier<UserId>('user ID')

@@ -1,3 +1,4 @@
+import { guidIdentifier } from '@/shared/domain/identifier'
 import type { ProjectId } from '@/features/projects/domain/project'
 import type { UserId } from '@/features/session/domain/user'
 
@@ -19,6 +20,4 @@ export interface Task {
   completedAt: Date | null
 }
 
-export function taskId(value: string): TaskId {
-  return value as TaskId
-}
+export const taskId = guidIdentifier<TaskId>('task ID')

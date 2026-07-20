@@ -1,8 +1,7 @@
+import { guidIdentifier } from '@/shared/domain/identifier'
 import type { UserId } from '@/features/session/domain/user'
 
 declare const projectIdBrand: unique symbol
-
-const guidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export type ProjectId = string & { readonly [projectIdBrand]: true }
 
@@ -14,8 +13,4 @@ export interface Project {
   createdAt: Date
 }
 
-export function projectId(value: string): ProjectId {
-  if (!guidPattern.test(value)) throw new Error('A valid project ID is required.')
-
-  return value as ProjectId
-}
+export const projectId = guidIdentifier<ProjectId>('project ID')
