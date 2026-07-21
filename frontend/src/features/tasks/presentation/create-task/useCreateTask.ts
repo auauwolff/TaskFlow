@@ -1,8 +1,9 @@
-import { useMutation } from '@apollo/client/react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { ProjectId } from '@/features/projects/domain/project'
 import { errorMessage } from '@/shared/errors/appError'
 import type { TaskPriority } from '../../domain/task'
-import { CREATE_TASK_DOCUMENT, TASKS_DOCUMENT, toGraphqlPriority } from '../taskGraphql'
+import { taskKeys } from '../taskKeys'
+import { useTasksGateway } from '../tasksGatewayService'
 
 export interface CreateTaskDraft {
   title: string
@@ -11,28 +12,26 @@ export interface CreateTaskDraft {
 }
 
 export function useCreateTask(projectId: ProjectId) {
-  const [createTask, creation] = useMutation(CREATE_TASK_DOCUMENT)
+  const gateway = useTasksGateway()
+  const queryClient = useQueryClient()
+  const creation = useMutation({
+    mutationKey: ['tasks', 'create'] as const,
+    mutationFn: (draft: CreateTaskDraft) => gateway.create({ ...draft, projectId }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId) })
+    },
+  })
 
   return {
     create: async (draft: CreateTaskDraft) => {
       try {
-        await createTask({
-          variables: {
-            input: {
-              ...draft,
-              projectId,
-              priority: toGraphqlPriority(draft.priority),
-            },
-          },
-          refetchQueries: [{ query: TASKS_DOCUMENT, variables: { projectId } }],
-          awaitRefetchQueries: true,
-        })
+        await creation.mutateAsync(draft)
         return true
       } catch {
         return false
       }
     },
-    error: creation.error === undefined ? null : errorMessage(creation.error),
-    isCreating: creation.loading,
+    error: creation.error === null ? null : errorMessage(creation.error),
+    isCreating: creation.isPending,
   }
 }

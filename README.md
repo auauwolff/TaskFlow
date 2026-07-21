@@ -63,14 +63,14 @@ The frontend uses feature-first Hexagonal Architecture. A feature creates only t
 
 ```mermaid
 flowchart LR
-    Composition[app/composition] --> Presentation[presentation<br/>React, Router, Query, Apollo, MobX]
+    Composition[app/composition] --> Presentation[presentation<br/>React, Router, Query, MobX]
     Composition --> Adapters[adapters<br/>HTTP, GraphQL, browser APIs]
     Presentation --> Application[application<br/>use cases and ports]
     Adapters --> Application
     Application --> Domain[domain<br/>models and policies]
 ```
 
-- TanStack Query owns project and session server state; Apollo owns task server state.
+- TanStack Query owns project, session, and task server state; REST and GraphQL are transports feeding it.
 - A project-scoped MobX view store owns task-filter interaction state without copying server data.
 - TanStack Router owns shareable navigation state.
 - React Hook Form owns form values and validation.
@@ -94,7 +94,7 @@ application dependency.
 - .NET 10, ASP.NET Core controllers and Hot Chocolate GraphQL, EF Core, Npgsql, PostgreSQL
 - OpenID Connect, secure cookie BFF, Keycloak for local development
 - FluentValidation, Problem Details, Serilog, OpenAPI/Swagger
-- React 19, TypeScript, Vite, TanStack Router/Query, Apollo Client, MobX, React Hook Form
+- React 19, TypeScript, Vite, TanStack Router/Query, a typed GraphQL fetch transport, MobX, React Hook Form
 - xUnit, NSubstitute, FluentAssertions, Vitest, Playwright, Dependency Cruiser, Oxlint
 
 ## Repository

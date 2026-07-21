@@ -49,7 +49,7 @@ export class HttpProjectsGateway implements ProjectsGateway {
     try {
       const { data, error, response } = await this.client.POST('/api/projects', {
         body: input,
-        headers: await this.antiforgery.header(signal),
+        headers: await this.antiforgery.header(),
         signal,
       })
 

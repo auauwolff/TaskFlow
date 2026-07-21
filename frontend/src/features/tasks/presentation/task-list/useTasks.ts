@@ -1,9 +1,10 @@
-import { useQuery } from '@apollo/client/react'
+import { useQuery } from '@tanstack/react-query'
 import type { ProjectId } from '@/features/projects/domain/project'
 import type { UserId } from '@/features/session/domain/user'
 import { errorMessage } from '@/shared/errors/appError'
 import type { TaskId, TaskPriority, TaskStatus } from '../../domain/task'
-import { TASKS_DOCUMENT, toTask } from '../taskGraphql'
+import { useTasksGateway } from '../tasksGatewayService'
+import { tasksOptions } from './taskQueries'
 
 export interface TaskListItem {
   id: TaskId
@@ -24,10 +25,11 @@ export type TasksModel =
 const dateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
 
 export function useTasks(projectId: ProjectId): TasksModel {
-  const tasks = useQuery(TASKS_DOCUMENT, { variables: { projectId } })
+  const gateway = useTasksGateway()
+  const tasks = useQuery(tasksOptions(gateway, projectId))
 
-  if (tasks.loading && tasks.data === undefined) return { status: 'loading' }
-  if (tasks.error !== undefined)
+  if (tasks.isPending) return { status: 'loading' }
+  if (tasks.isError)
     return {
       status: 'error',
       message: errorMessage(tasks.error),
@@ -36,7 +38,7 @@ export function useTasks(projectId: ProjectId): TasksModel {
 
   return {
     status: 'ready',
-    tasks: (tasks.data?.tasks ?? []).map(toTask).map((task) => ({
+    tasks: tasks.data.map((task) => ({
       id: task.id,
       title: task.title,
       description: task.description,

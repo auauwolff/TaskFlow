@@ -51,8 +51,9 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 
 - **Done:** Phase 0 ✅, Phase 1 ✅, Phase 2 ✅, Phase 3 ✅, Phase 4 ✅, Phase 5 ✅
 - **In progress:** Phase 6 — provider-neutral authentication plus project/task workflows complete;
-  CI and full-stack application containers next.
-- **Last updated:** 2026-07-19
+  tasks now run over GraphQL behind a `TasksGateway` port (single TanStack Query cache, REST + GraphQL
+  transports); CI and full-stack application containers next.
+- **Last updated:** 2026-07-21
 
 ## 🗺️ Roadmap & checklist
 
@@ -88,6 +89,32 @@ MediatR / CQRS, AutoMapper, Result pattern, Testcontainers, .NET Aspire.
 4. Tell Claude "continue with Phase N" (or `/loop`-style: "pick up where PROGRESS.md says").
 
 ## 📓 Session log
+
+### 2026-07-21 — Phase 6e 🚧 Heterogeneous transports behind gateway ports
+- Goal: prove the clean-architecture boundary lets a feature swap its *transport* (REST ⇄ GraphQL)
+  without touching its port, presentation, or domain — a reference example for future monorepos.
+- Gave tasks a real `TasksGateway` application port that mirrors `ProjectsGateway`. The GraphQL
+  documents and wire→domain mapping moved out of presentation into `adapters/graphqlTasksGateway.ts`,
+  so tasks now structurally match projects: port → adapter → focused presentation hooks.
+- Demoted the GraphQL library to a transport. Removed Apollo Client (and the `graphql` package);
+  `shared/graphql/client.ts` is now a ~40-line typed `fetch` client carrying the same antiforgery
+  header and 401 policy as the REST client. TanStack Query is now the single server-state cache for
+  projects, session, **and** tasks — no second cache to keep in sync, no cache-conflict surface.
+- MobX stays in its lane: the project-scoped `TasksWorkspaceViewStore` owns only the task filter
+  (view state), never server data.
+- Fixed a latent bug surfaced by the swap: `HttpAntiforgeryClient` memoizes one shared token promise
+  but bound it to the first caller's `AbortSignal`. GraphQL reads are POSTs (so they need the CSRF
+  token, unlike the projects REST GET), so on reload a Strict Mode double-render cancelled the first
+  query, aborted the *shared* token fetch, and the retry inherited the abort and showed a hard error.
+  The shared token now loads without a per-request signal — cancelling one request can no longer reject
+  a resource other requests are awaiting.
+- Updated the in-app architecture explorer and the READMEs/ARCHITECTURE docs to describe one cache with
+  two transports behind identical gateway ports (previously "two server-state engines").
+- Verification: `tsc` clean, oxlint clean, dependency-cruiser clean (87 modules), 47/47 Vitest tests,
+  production build passed, and 4/4 Playwright journeys passed (the e2e caught the antiforgery regression
+  before this entry — a good argument for keeping the browser suite load-bearing).
+- **Next:** unchanged from 6d — CI quality gates, root error/not-found UI, server field-error mapping,
+  and production API/frontend containers with a trusted reverse proxy.
 
 ### 2026-07-19 — Phase 6d 🚧 URL-owned project workspaces + task vertical slice
 - Corrected first-party .NET OpenAPI enum metadata so generated TypeScript now represents task status

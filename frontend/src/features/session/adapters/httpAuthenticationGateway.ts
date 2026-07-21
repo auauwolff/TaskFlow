@@ -34,9 +34,9 @@ export class HttpAuthenticationGateway implements AuthenticationGateway {
     window.location.assign(`/api/auth/login?${query}`)
   }
 
-  async signOut(signal?: AbortSignal): Promise<void> {
+  async signOut(_signal?: AbortSignal): Promise<void> {
     try {
-      const header = await this.antiforgery.header(signal)
+      const header = await this.antiforgery.header()
       const form = document.createElement('form')
       const token = document.createElement('input')
       form.method = 'post'

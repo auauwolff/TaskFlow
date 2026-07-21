@@ -1,4 +1,3 @@
-import { ApolloProvider, useApolloClient } from '@apollo/client/react'
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { useEffect, type PropsWithChildren } from 'react'
 import { transitionToAnonymousSession } from '@/features/session/presentation/current-session/sessionCache'
@@ -15,9 +14,7 @@ export function AppProviders({ runtime, children }: AppProvidersProps) {
   return (
     <ServiceProvider services={runtime.services}>
       <QueryClientProvider client={runtime.queryClient}>
-        <ApolloProvider client={runtime.apolloClient}>
-          <AuthenticatedCacheBoundary>{children}</AuthenticatedCacheBoundary>
-        </ApolloProvider>
+        <AuthenticatedCacheBoundary>{children}</AuthenticatedCacheBoundary>
       </QueryClientProvider>
     </ServiceProvider>
   )
@@ -25,7 +22,6 @@ export function AppProviders({ runtime, children }: AppProvidersProps) {
 
 function AuthenticatedCacheBoundary({ children }: PropsWithChildren) {
   const queryClient = useQueryClient()
-  const apolloClient = useApolloClient()
   const antiforgery = useService(antiforgeryClientToken)
   const session = useSession()
 
@@ -34,8 +30,7 @@ function AuthenticatedCacheBoundary({ children }: PropsWithChildren) {
 
     transitionToAnonymousSession(queryClient)
     antiforgery.clear()
-    void apolloClient.clearStore()
-  }, [antiforgery, apolloClient, queryClient, session.status])
+  }, [antiforgery, queryClient, session.status])
 
   return children
 }

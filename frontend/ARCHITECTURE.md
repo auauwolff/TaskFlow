@@ -8,7 +8,7 @@ application workflows independent from React, HTTP, identity providers, and serv
 ```text
 app/composition
       |
-      +-----------> presentation (React, Router, Query/Apollo/MobX bindings)
+      +-----------> presentation (React, Router, Query/MobX bindings)
       |                         |
       +-----------> adapters ---+---> application ports ---> domain
 ```
@@ -26,7 +26,7 @@ layers are avoided.
 
 `createAppRuntime()` is the application composition root. It registers shared infrastructure, invokes
 each feature's `add*Module()` function, and builds the object graph before React renders. `AppRuntime`
-contains the resulting immutable service resolver, TanStack Query client, and Apollo client; feature code never receives the
+contains the resulting immutable service resolver and TanStack Query client; feature code never receives the
 complete runtime or resolver.
 
 `shared/ioc` is a package-ready, framework-neutral typed container plus a thin React 19 bridge. Typed
@@ -80,7 +80,7 @@ live in `.dependency-cruiser.cjs`, making the dependency rule executable rather 
 | State | Owner |
 | --- | --- |
 | Projects returned by REST | TanStack Query |
-| Tasks returned by GraphQL | Apollo Client |
+| Tasks returned by GraphQL | TanStack Query |
 | Current authenticated user | TanStack Query session cache |
 | OIDC protocol, tokens, and session cookie | ASP.NET authentication adapter |
 | Selected resource and shareable filters | Router path/search parameters |
@@ -89,11 +89,11 @@ live in `.dependency-cruiser.cjs`, making the dependency rule executable rather 
 | Other local interaction state | React |
 | Stable gateways and services | Typed IoC registrations through focused feature hooks |
 
-Server data is never copied between caches or into MobX. Session/projects use focused TanStack Query
-hooks; tasks use focused Apollo hooks and normalized GraphQL entities. Components consume TaskFlow-owned
-presentation models rather than either library's result objects. The IoC React bridge distributes one
-immutable resolver and scoped view stores, not server data. Crossing into an anonymous session clears
-authenticated Query data, the Apollo store, and the cached antiforgery token.
+Server data is never copied into MobX. Projects, session, and tasks all use focused TanStack Query
+hooks over their feature gateway; the REST and GraphQL transports feed the same single server-state
+cache. Components consume TaskFlow-owned presentation models rather than the library's result objects.
+The IoC React bridge distributes one immutable resolver and scoped view stores, not server data.
+Crossing into an anonymous session clears authenticated Query data and the cached antiforgery token.
 
 When state must be shared across components, choose its owner by meaning rather than reach:
 
@@ -103,11 +103,11 @@ When state must be shared across components, choose its owner by meaning rather 
 4. Lift transient interaction state to the nearest common component that needs it.
 5. Use a scoped MobX view store for interconnected workspace interactions and computed UI state.
 6. Use a focused Context plus reducer for simple cross-tree concerns such as theme or notifications.
-7. A client store must not duplicate Query, Apollo, Router, or form state.
+7. A client store must not duplicate Query, Router, or form state.
 
 New application complexity should come from real capabilities. Project selection, task filters, and
-task workflows naturally exercise URL, two server-state engines, form state, and a scoped MobX store
-without introducing a global application store.
+task workflows naturally exercise URL, two transports behind one server-state engine, form state, and
+a scoped MobX store without introducing a global application store.
 
 A pathless authenticated route owns session loading, failure, anonymous, and ready rendering. Child
 pages do not receive session props. Shared authenticated chrome reads the cached session at the route
@@ -127,11 +127,14 @@ Projects and session use REST. `openapi-typescript` generates `src/shared/api/sc
 transport types stay inside HTTP adapters. Adapters map transport DTOs and RFC Problem Details into
 frontend models and `AppError`; components do not import generated schemas or call `fetch`.
 
-Tasks deliberately use a second delivery path. Apollo posts typed task operations to `/api/graphql`,
-and Hot Chocolate resolvers delegate to the same backend `ITaskService` used by REST controllers.
-Task GraphQL enum, ID, and date values are mapped into the existing frontend task model at
-`features/tasks/presentation/taskGraphql.ts`. The same-origin cookie and antiforgery header protect
-both transports.
+Tasks deliberately use a second delivery path behind an identical seam. `TasksGateway`
+(`features/tasks/application/ports.ts`) is a plain application port; its adapter
+(`features/tasks/adapters/graphqlTasksGateway.ts`) posts typed task operations to `/api/graphql`,
+where Hot Chocolate resolvers delegate to the same backend `ITaskService` used by REST controllers.
+The GraphQL library is deliberately demoted to a transport: `shared/graphql/client.ts` is a tiny typed
+`fetch` client carrying the same antiforgery header and 401 policy as the REST client, so the adapter
+maps GraphQL enum, ID, and date values into the frontend task model exactly as the REST adapter maps
+Problem Details. The same-origin cookie and antiforgery header protect both transports.
 
 Authentication follows the same boundary. The session application layer depends on an
 `AuthenticationGateway`; its HTTP adapter calls stable TaskFlow endpoints (`/api/auth/me`, login,
@@ -147,11 +150,13 @@ pnpm generate:api
 
 ## Replaceability
 
-Projects and tasks intentionally demonstrate different outer-layer choices. Project components are
-shielded from TanStack Query by focused hooks; task components are shielded from Apollo in the same
-way. Replacing either server-state engine changes that feature's presentation adapter and cache policy,
-not its component contract or domain model. Replacing REST with GraphQL changes the transport edge and
-backend delivery adapter while shared application services and domain behavior remain reusable.
+Projects and tasks intentionally demonstrate different transports behind the same architecture.
+Both expose a feature gateway port (`ProjectsGateway`, `TasksGateway`) whose adapter owns the
+transport — REST for projects, GraphQL for tasks — while both features drive a single TanStack Query
+cache through focused hooks. Swapping a feature's transport (REST for GraphQL, or vice versa) replaces
+only its adapter; its gateway port, presentation hooks, component contract, and domain model are
+untouched. This is the payoff of the port seam: the heterogeneous transports prove the boundary is
+real, not that two server-state caches coexist.
 
-Do not build a generic wrapper around Query, Apollo, or MobX. Abstract feature intent (`ProjectsGateway`,
+Do not build a generic wrapper around Query or MobX. Abstract feature intent (`ProjectsGateway`,
 `useProjects`, `useTasks`, `TasksWorkspaceViewStore`) rather than recreating a universal cache API.

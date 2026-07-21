@@ -1,3 +1,4 @@
+import { observer } from 'mobx-react-lite'
 import type { ProjectId } from '@/features/projects/domain/project'
 import { useCurrentUser } from '@/features/session/presentation/current-session/useSession'
 import { useAssignTask } from '../assign-task/useAssignTask'
@@ -105,4 +106,3 @@ export const TaskList = observer(function TaskList({ projectId }: { projectId: P
     </section>
   )
 })
-import { observer } from 'mobx-react-lite'
