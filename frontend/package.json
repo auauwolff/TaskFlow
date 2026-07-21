@@ -13,6 +13,8 @@
     "test:e2e": "bash e2e/run.sh",
     "test:e2e:ui": "bash e2e/run.sh --ui",
     "generate:api": "openapi-typescript http://localhost:5131/openapi/v1.json -o src/shared/api/schema.d.ts",
+    "generate:graphql": "dotnet run --project ../backend/src/TaskFlow.Api -- schema export --output src/shared/graphql/schema.graphql && rm -f src/shared/graphql/schema-settings.json && graphql-codegen --config codegen.ts",
+    "generate:graphql:types": "graphql-codegen --config codegen.ts",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -31,6 +33,9 @@
     "react-hook-form": "^7.82.0"
   },
   "devDependencies": {
+    "@graphql-codegen/cli": "^7.2.0",
+    "@graphql-codegen/client-preset": "^6.1.0",
+    "@graphql-typed-document-node/core": "^3.2.0",
     "@playwright/test": "^1.61.1",
     "@tanstack/router-plugin": "^1.168.22",
     "@testing-library/dom": "^10.4.1",
@@ -40,6 +45,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
     "dependency-cruiser": "^17.3.1",
+    "graphql": "^16.14.2",
     "jsdom": "^29.1.1",
     "openapi-typescript": "^7.13.0",
     "oxlint": "^1.71.0",

@@ -1,6 +1,6 @@
 import { userId } from '@/features/session/domain/user'
 import { apiError, networkError } from '@/shared/api/apiError'
-import type { AntiforgeryClient } from '@/shared/api/antiforgery'
+import { clearIfTokenRejected, type AntiforgeryClient } from '@/shared/api/antiforgery'
 import type { ApiClient } from '@/shared/api/client'
 import type { components } from '@/shared/api/schema'
 import { AppError } from '@/shared/errors/appError'
@@ -54,7 +54,7 @@ export class HttpProjectsGateway implements ProjectsGateway {
       })
 
       if (data !== undefined) return toProject(data)
-      this.antiforgery.clear()
+      clearIfTokenRejected(this.antiforgery, response)
       throw apiError(response, error)
     } catch (error) {
       throw networkError(error)

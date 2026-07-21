@@ -39,6 +39,12 @@ export function ServiceScopeProvider({
 
 function ServiceScope({ configure, children }: Omit<ServiceScopeProviderProps, 'scopeKey'>) {
   const parent = useRequiredServices()
+  // Known limitation: Strict Mode double-invokes this initializer and discards one result, and
+  // the discarded scope is never disposed — there is no React hook for "this render was thrown
+  // away". The consequence is a rule, enforced by convention: scoped service constructors must
+  // be resource-free (memory only). Anything that opens a subscription, socket, or timer must
+  // acquire it lazily on first use and release it in dispose(), so a discarded scope holds
+  // nothing worth releasing.
   const [scope, setScope] = useState(() => parent.createScope(configure))
   const scopeRef = useRef(scope)
   scopeRef.current = scope

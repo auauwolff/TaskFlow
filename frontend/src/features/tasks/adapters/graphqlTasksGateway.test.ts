@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { projectId } from '@/features/projects/domain/project'
 import type { GraphqlClient } from '@/shared/graphql/client'
+import type { TypedDocumentString } from '@/shared/graphql/generated/graphql'
 import { GraphqlTasksGateway } from './graphqlTasksGateway'
 
 const wireTask = {
-  __typename: 'TaskItemDto' as const,
   id: '00000000-0000-4000-8000-000000000001',
   projectId: '00000000-0000-4000-8000-000000000002',
   title: 'Map GraphQL',
@@ -24,8 +24,11 @@ class StubGraphqlClient implements GraphqlClient {
     this.payload = payload
   }
 
-  async request<TData>(_document: string, variables?: Record<string, unknown>): Promise<TData> {
-    this.lastVariables = variables
+  async request<TData, TVariables>(
+    _document: TypedDocumentString<TData, TVariables>,
+    variables?: TVariables,
+  ): Promise<TData> {
+    this.lastVariables = variables as Record<string, unknown> | undefined
     return this.payload as TData
   }
 }

@@ -6,6 +6,16 @@ export interface AntiforgeryClient {
   clear(): void
 }
 
+/**
+ * Drops the memoized token only when the response says the token itself was the problem: the
+ * backend rejects a stale or missing CSRF token with 400 (AntiforgeryValidationException) and
+ * denies with 403. Other failures (404, 409, 500) say nothing about the token, and clearing it
+ * there would force a needless re-fetch before the next mutation.
+ */
+export function clearIfTokenRejected(antiforgery: AntiforgeryClient, response: Response): void {
+  if (response.status === 400 || response.status === 403) antiforgery.clear()
+}
+
 export class HttpAntiforgeryClient implements AntiforgeryClient {
   private readonly client: ApiClient
   private token: Promise<string> | null = null

@@ -197,6 +197,14 @@ export class ServiceContainer implements ServiceScopeResolver {
     if (this.#disposed) throw new Error('This service scope has been disposed.')
   }
 
+  /**
+   * Eagerly instantiates every singleton registered here and every scoped registration visible
+   * through the parent chain. This is the trade that makes getStable() legal during React render:
+   * all instantiation (a side effect) happens at container creation, so render-time resolution is
+   * a pure cache read. The cost is deliberate and worth knowing: each new scope also instantiates
+   * ancestor-scoped registrations its subtree may never touch, so scoped constructors must stay
+   * cheap and resource-free (see ServiceScope in react.tsx for the companion rule).
+   */
   initializeStableServices(): void {
     for (const registration of this.#registrations.values()) {
       if (registration.lifetime === 'singleton') this.get(registration.token)

@@ -168,4 +168,8 @@ app.MapControllers();
 app.MapGraphQL("/api/graphql")
     .RequireAuthorization();
 
-app.Run();
+// RunWithGraphQLCommands behaves exactly like Run() when no arguments are passed. It additionally
+// enables `dotnet run -- schema export`, which the frontend uses to snapshot the GraphQL contract
+// for client code generation (see frontend `generate:graphql`) — the SDL is exported from the
+// executable schema itself, so the snapshot can never drift from what the server actually serves.
+await app.RunWithGraphQLCommandsAsync(args);
