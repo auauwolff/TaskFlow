@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:e2e": "bash e2e/run.sh",
     "test:e2e:ui": "bash e2e/run.sh --ui",
+    "test:e2e:architecture": "playwright test --config playwright.architecture.config.ts",
     "generate:api": "openapi-typescript http://localhost:5131/openapi/v1.json -o src/shared/api/schema.d.ts",
     "generate:graphql": "dotnet run --project ../backend/src/TaskFlow.Api -- schema export --output src/shared/graphql/schema.graphql && rm -f src/shared/graphql/schema-settings.json && graphql-codegen --config codegen.ts",
     "generate:graphql:types": "graphql-codegen --config codegen.ts",
