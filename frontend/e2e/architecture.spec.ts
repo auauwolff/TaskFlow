@@ -44,6 +44,25 @@ test.describe('architecture explorer', () => {
     await page.screenshot({ path: 'test-results/architecture/composition.png', fullPage: true })
   })
 
+  test('explains the feature-free pattern in a nutshell', async ({ page }) => {
+    await openExplorer(page)
+    await page.getByRole('button', { name: '02 Frontend' }).click()
+    await page.getByRole('button', { name: 'In a nutshell' }).click()
+
+    await expect(page.getByText('Every feature is this shape.')).toBeVisible()
+    await expect(architectureNode(page, 'The port')).toBeVisible()
+    await expect(architectureNode(page, 'The adapter')).toBeVisible()
+    await expect(architectureNode(page, 'A feature module')).toBeVisible()
+
+    // One anonymized slice: one inverted implements arrow, two registration steps, and the
+    // instance flowing back out through container and token at runtime.
+    expect(await page.locator('.react-flow__edge.architecture-edge--implements').count()).toBe(1)
+    expect(await page.locator('.react-flow__edge.architecture-edge--registers').count()).toBe(2)
+    expect(await page.locator('.react-flow__edge.architecture-edge--runtime').count()).toBe(2)
+
+    await page.screenshot({ path: 'test-results/architecture/nutshell.png', fullPage: true })
+  })
+
   test('shows the DI inversion lens with both arrow systems', async ({ page }) => {
     await openExplorer(page)
     await page.getByRole('button', { name: 'DI inversion' }).click()

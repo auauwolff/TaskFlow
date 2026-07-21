@@ -3,6 +3,7 @@ import type { Edge, Node } from '@xyflow/react'
 export type ArchitectureViewId =
   | 'overview'
   | 'frontend'
+  | 'frontend-nutshell'
   | 'frontend-composition'
   | 'frontend-session'
   | 'frontend-projects'
@@ -13,7 +14,6 @@ export type ArchitectureViewId =
   | 'backend-domain'
   | 'backend-infrastructure'
   | 'sign-in'
-  | 'task-request'
   | 'di-inversion'
   | 'di-inversion-without'
 
@@ -133,7 +133,7 @@ const api: ArchitectureNodeData = {
   drilldown: 'backend',
 }
 
-export const primaryViewOrder: ArchitectureViewId[] = ['overview', 'frontend', 'backend', 'sign-in', 'task-request', 'di-inversion']
+export const primaryViewOrder: ArchitectureViewId[] = ['overview', 'frontend', 'backend', 'sign-in', 'di-inversion']
 
 export const architectureViews: Record<ArchitectureViewId, ArchitectureView> = {
   overview: {
@@ -214,6 +214,79 @@ export const architectureViews: Record<ArchitectureViewId, ArchitectureView> = {
       edge('tasks-projects', 'tasks', 'projects', 'ProjectId'),
       edge('tasks-session', 'tasks', 'session', 'UserId + current user'),
       edge('tasks-shared', 'tasks', 'shared', 'GraphQL + Query'),
+    ],
+  },
+
+  'frontend-nutshell': {
+    id: 'frontend-nutshell', parent: 'frontend', label: 'In a nutshell', eyebrow: 'Frontend / the pattern', title: 'Every feature is this shape.',
+    description: 'The frontend with the features removed: one anonymous slice and the machinery that serves it. Session, projects, and tasks are each a copy of this shape — only the names, the transport, and an optional route scope differ.',
+    nodes: [
+      node('screen', 0, 60, {
+        label: 'A screen', kind: 'Presentation', level: 'Module', technology: 'React component',
+        description: 'Renders the view model and translates user gestures into feature intent. Owns no server state, no transport, and no domain rules.',
+        responsibility: 'The only place that knows about pixels.',
+      }),
+      node('hook', 460, 60, {
+        label: 'A view-model hook', kind: 'State', level: 'Module', technology: 'TanStack Query / MobX',
+        description: 'The slice orchestrator: resolves the gateway instance through the token, runs the query or mutation, and maps domain objects into a render-ready view model.',
+        responsibility: 'The one line of DI a consumer ever pays: useService(token).',
+      }),
+      node('port', 960, 60, {
+        label: 'The port', kind: 'Application', level: 'Module', technology: 'TypeScript interface',
+        description: 'A contract stating what the slice needs, in its own vocabulary — list, get, create — with no mention of HTTP or GraphQL. Both static arrow systems converge here.',
+        responsibility: 'The line dependency inversion is drawn across.',
+      }),
+      node('domain', 1420, 60, {
+        label: 'The domain model', kind: 'Domain', level: 'Module', technology: 'Branded types + validation',
+        description: 'The slice vocabulary: branded IDs, validated values, real dates. Wire data is converted once at the adapter; everything inward trusts these types.',
+        responsibility: 'No React, no transport, no framework.',
+      }),
+      node('adapter', 960, -280, {
+        label: 'The adapter', kind: 'Adapter', level: 'Module', technology: 'REST or GraphQL gateway',
+        description: 'Implements the port using a shared transport and converts wire data into domain models at the trust boundary. Swapping it is invisible to every consumer.',
+        responsibility: 'The only file where slice intent becomes a protocol.',
+      }),
+      node('transport', 1420, -280, {
+        label: 'Shared transports', kind: 'Adapter', level: 'Module', technology: 'openapi-fetch / GraphQL client',
+        description: 'Typed REST and GraphQL clients with CSRF and 401 policy baked in. Registered once as root singletons; they move bytes and know nothing about any feature.',
+        responsibility: 'Generic transport written once, reused by every adapter.', sourcePath: 'frontend/src/shared',
+      }),
+      node('token', 460, 340, {
+        label: 'The token', kind: 'Token', level: 'Module', technology: 'unique symbol',
+        description: 'The runtime name of the port, needed because interfaces are erased at compile time. Registration stores a factory under it; the hook resolves an instance by it.',
+        responsibility: 'Where the static and runtime arrow systems meet.',
+      }),
+      node('app-composition', 640, 640, {
+        label: 'composition.ts', kind: 'Composition', level: 'File', technology: 'src/app/composition.ts',
+        description: 'The app root: registers the shared singletons, invokes each feature module, and builds the container before React renders.',
+        responsibility: 'Knows that slices participate, never what they register.', sourcePath: 'frontend/src/app/composition.ts',
+      }),
+      node('feature-module', 1080, 640, {
+        label: 'A feature module', kind: 'Composition', level: 'Module', technology: 'addXModule(services)',
+        description: 'One function deciding which adapter satisfies the slice port — the only file that names both. A slice needing per-route state adds a second, scoped registration mounted by a ServiceScopeProvider.',
+        responsibility: 'Each slice owns its object graph.',
+      }),
+      node('container', 1520, 640, {
+        label: 'The container', kind: 'Composition', level: 'Module', technology: 'shared/ioc',
+        description: 'Runs every factory eagerly, caches instances by token, enforces lifetimes, and reaches React through one context provider — so render-time resolution is a pure cache read.',
+        responsibility: 'Holds instances; knows no feature.', sourcePath: 'frontend/src/shared/ioc/core.ts',
+      }),
+    ],
+    edges: [
+      // The static system: everything converges inward on the port and the domain vocabulary.
+      edge('screen-hook', 'screen', 'hook', 'reads the view model'),
+      edge('hook-port', 'hook', 'port', 'calls the contract'),
+      edge('hook-domain', 'hook', 'domain', 'maps into view state', 'imports', { intoBelow: true }),
+      edge('port-domain', 'port', 'domain', 'speaks the vocabulary'),
+      edge('adapter-port', 'adapter', 'port', 'implements', 'implements'),
+      edge('adapter-domain', 'adapter', 'domain', 'wire data in, domain out'),
+      edge('adapter-transport', 'adapter', 'transport', 'moves bytes'),
+      // The wiring: factories recorded under tokens, no instances yet.
+      edge('app-feature', 'app-composition', 'feature-module', 'adds the module', 'registers'),
+      edge('feature-container', 'feature-module', 'container', 'records the factory', 'registers'),
+      // The runtime system: the instance flows outward, opposite to the static arrows.
+      edge('container-token', 'container', 'token', 'build() caches the instance', 'runtime', { fromBelow: true, intoBelow: true }),
+      edge('token-hook', 'token', 'hook', 'useService(token) at render', 'runtime', { fromBelow: true, intoBelow: true }),
     ],
   },
 
@@ -510,28 +583,8 @@ export const architectureViews: Record<ArchitectureViewId, ArchitectureView> = {
     ],
   },
 
-  'task-request': {
-    id: 'task-request', label: 'Task request', eyebrow: 'Runtime lens / B', title: 'A gesture through concrete files.',
-    description: 'Runtime sequence for task completion. Every code node links to the exact file handling that step.',
-    nodes: [
-      file('ui', 0, 180, 'TaskList.tsx', 'Presentation', 'frontend/src/features/tasks/presentation/task-list/TaskList.tsx', 'Captures the complete gesture.', 'Presentation emits application intent.'),
-      file('hook', 470, 180, 'useCompleteTask.ts', 'State', 'frontend/src/features/tasks/presentation/complete-task/useCompleteTask.ts', 'Starts the mutation through the TasksGateway port and invalidates the exact project task list.', 'Query owns the mutation lifecycle; the port hides the transport.'),
-      file('gateway', 940, 180, 'graphqlTasksGateway.ts', 'Adapter', 'frontend/src/features/tasks/adapters/graphqlTasksGateway.ts', 'Executes the typed completeTask document with the CSRF header through the shared GraphQL client.', 'The only file where task intent becomes GraphQL.'),
-      file('controller', 1410, 180, 'TaskMutations.cs', 'Presentation', 'backend/src/TaskFlow.Api/GraphQL/TaskMutations.cs', 'Invokes the existing task completion use case.', 'Translate GraphQL to an application call.'),
-      file('service', 1880, 180, 'TaskService.cs', 'Application', 'backend/src/TaskFlow.Application/Tasks/TaskService.cs', 'Loads owned task and coordinates commit.', 'Enforce use-case policy.'),
-      file('domain-task', 2280, 20, 'TaskItem.cs', 'Domain', 'backend/src/TaskFlow.Domain/Entities/TaskItem.cs', 'Applies the valid completion transition.', 'Own lifecycle rules.'),
-      file('dbcontext', 2280, 340, 'TaskFlowDbContext.cs', 'Adapter', 'backend/src/TaskFlow.Infrastructure/Persistence/TaskFlowDbContext.cs', 'Commits tracked aggregate changes.', 'Persist one use-case transaction.'),
-    ],
-    edges: [
-      edge('t1', 'ui', 'hook', '1. complete(taskId)', 'runtime'), edge('t2', 'hook', 'gateway', '2. gateway.complete(id) via the port', 'runtime'),
-      edge('t3', 'gateway', 'controller', '3. GraphQL mutation + CSRF', 'runtime'),
-      edge('t4', 'controller', 'service', '4. CompleteAsync', 'runtime'), edge('t5', 'service', 'domain-task', '5. Complete()', 'runtime'),
-      edge('t6', 'service', 'dbcontext', '6. SaveChanges', 'runtime'), edge('t7', 'controller', 'ui', '7. normalized task + refetch', 'runtime'),
-    ],
-  },
-
   'di-inversion': {
-    id: 'di-inversion', label: 'DI inversion', eyebrow: 'Runtime lens / C', title: 'Two arrow systems, opposite directions.',
+    id: 'di-inversion', label: 'DI inversion', eyebrow: 'Runtime lens / B', title: 'Two arrow systems, opposite directions.',
     description: 'Followed through one port: solid compile-time arrows converge inward on ProjectsGateway — the consumer and the adapter never learn about each other. The animated instance flows the other way, from composition through the container to the component. The token is the only thing both worlds share. Toggle the counterfactual to see what the port prevents.',
     nodes: [
       file('consumer', 0, 60, 'useProjects.ts', 'Presentation', 'frontend/src/features/projects/presentation/project-list/useProjects.ts', 'Consumer: fetches projects through the gateway. It names the ProjectsGateway type and the hook — it has no idea HTTP exists.', 'Knows the contract, never the adapter.', 'const gateway = useProjectsGateway()'),
@@ -555,7 +608,7 @@ export const architectureViews: Record<ArchitectureViewId, ArchitectureView> = {
   },
 
   'di-inversion-without': {
-    id: 'di-inversion-without', parent: 'di-inversion', label: 'Without the port', eyebrow: 'Runtime lens / C — counterfactual', title: 'What the port prevents.',
+    id: 'di-inversion-without', parent: 'di-inversion', label: 'Without the port', eyebrow: 'Runtime lens / B — counterfactual', title: 'What the port prevents.',
     description: 'Delete the port and the token, and one red arrow replaces the whole machinery: the component imports the adapter directly. Cheaper today — and it costs the test stub (tests now need a real HTTP layer), the transport swap (the GraphQL migration would have edited every consumer), and the boundary (openapi-fetch types now leak into presentation).',
     nodes: [
       file('consumer', 0, 100, 'useProjects.ts', 'Presentation', 'frontend/src/features/projects/presentation/project-list/useProjects.ts', 'Now constructs or imports the concrete gateway itself, so it must also know about the API client, antiforgery, and 401 policy.', 'Coupled to a transport it never needed to know existed.'),

@@ -48,6 +48,7 @@ function ArchitectureNode({ data, selected }: NodeProps) {
 const nodeTypes = { architecture: ArchitectureNode }
 
 const viewKinds: Partial<Record<ArchitectureViewId, string>> = {
+  'frontend-nutshell': 'Application',
   'frontend-composition': 'Composition',
   'frontend-session': 'Application',
   'frontend-projects': 'Application',
@@ -153,6 +154,7 @@ function SourceViewer({ source, sourcePath, focus }: { source: string; sourcePat
 
 const viewChildren: Partial<Record<ArchitectureViewId, { id: ArchitectureViewId; label: string }[]>> = {
   frontend: [
+    { id: 'frontend-nutshell', label: 'In a nutshell' },
     { id: 'frontend-composition', label: 'Composition / DI' },
     { id: 'frontend-session', label: 'Session feature' },
     { id: 'frontend-projects', label: 'Projects feature' },
