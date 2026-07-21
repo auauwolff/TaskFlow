@@ -28,6 +28,13 @@ test.describe('architecture explorer', () => {
   test('distinguishes edge kinds in the composition view', async ({ page }) => {
     await openExplorer(page)
     await page.getByRole('button', { name: '02 Frontend' }).click()
+
+    // Every feature gets a root 'adds module' registration; tasks additionally gets its
+    // route-scoped workspace registration, and booting the router is runtime flow, not DI.
+    await expect(architectureNode(page, 'Tasks feature')).toBeVisible()
+    expect(await page.locator('.react-flow__edge.architecture-edge--registers').count()).toBe(4)
+    expect(await page.locator('.react-flow__edge.architecture-edge--runtime').count()).toBe(1)
+
     await page.getByRole('button', { name: 'Composition / DI' }).click()
 
     await expect(architectureNode(page, 'composition.ts').first()).toBeVisible()
