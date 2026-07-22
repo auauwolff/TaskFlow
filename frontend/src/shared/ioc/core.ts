@@ -16,12 +16,49 @@ export interface StableServiceResolver extends ServiceResolver {
 
 /**
  * A service that owns a resource (subscription, AbortController, timer) which must be released
- * when its container is torn down. Singleton and scoped instances implementing this are disposed
- * automatically when their owning container is disposed; transient instances are the caller's to
- * dispose because the container does not retain them.
+ * when its container is torn down. Container-owned singleton and scoped instances implementing
+ * this are disposed automatically when their owning container is disposed. Values and transient
+ * instances are caller-owned and are not retained or disposed by the container.
  */
 export interface Disposable {
   dispose(): void
+}
+
+export class ServiceRegistrationError extends Error {
+  readonly tokenName: string
+
+  constructor(
+    message: string,
+    tokenName: string,
+  ) {
+    super(message)
+    this.name = 'ServiceRegistrationError'
+    this.tokenName = tokenName
+  }
+}
+
+export class ServiceResolutionError extends Error {
+  readonly tokenName: string | undefined
+  readonly resolutionPath: readonly string[]
+
+  constructor(
+    message: string,
+    tokenName?: string,
+    resolutionPath: readonly string[] = [],
+    options?: ErrorOptions,
+  ) {
+    super(message, options)
+    this.name = 'ServiceResolutionError'
+    this.tokenName = tokenName
+    this.resolutionPath = resolutionPath
+  }
+}
+
+export class ServiceScopeUnavailableError extends Error {
+  constructor() {
+    super('This service scope or one of its ancestors has been disposed.')
+    this.name = 'ServiceScopeUnavailableError'
+  }
 }
 
 export type ConfigureServices = (services: ServiceCollection) => void
@@ -30,6 +67,7 @@ export interface ServiceScopeResolver extends StableServiceResolver {
   createScope(configure?: ConfigureServices): ServiceScopeResolver
   dispose(): void
   isDisposed(): boolean
+  isUsable(): boolean
 }
 
 export type ServiceFactory<T> = (services: ServiceResolver) => T
@@ -39,6 +77,7 @@ type ServiceLifetime = 'singleton' | 'scoped' | 'transient'
 interface Registration {
   readonly create: ServiceFactory<unknown>
   readonly lifetime: ServiceLifetime
+  readonly owned: boolean
   readonly token: ServiceToken<unknown>
 }
 
@@ -75,20 +114,21 @@ function isDisposable(value: unknown): value is Disposable {
 export class ServiceCollection {
   readonly #registrations = new Map<symbol, Registration>()
 
+  /** Registers a caller-owned value. Disposing the container never disposes the supplied value. */
   value<T>(token: ServiceToken<T>, value: T): this {
-    return this.add(token, 'singleton', () => value)
+    return this.add(token, 'singleton', false, () => value)
   }
 
   singleton<T>(token: ServiceToken<T>, create: ServiceFactory<T>): this {
-    return this.add(token, 'singleton', create)
+    return this.add(token, 'singleton', true, create)
   }
 
   scoped<T>(token: ServiceToken<T>, create: ServiceFactory<T>): this {
-    return this.add(token, 'scoped', create)
+    return this.add(token, 'scoped', true, create)
   }
 
   transient<T>(token: ServiceToken<T>, create: ServiceFactory<T>): this {
-    return this.add(token, 'transient', create)
+    return this.add(token, 'transient', false, create)
   }
 
   build(): ServiceContainer {
@@ -97,21 +137,36 @@ export class ServiceCollection {
 
   buildWithParent(parent: ServiceContainer | null): ServiceContainer {
     const container = new ServiceContainer(new Map(this.#registrations), parent)
-    container.initializeStableServices()
-    return container
+    try {
+      container.initializeStableServices()
+      return container
+    } catch (initializationError) {
+      try {
+        container.dispose()
+      } catch (disposalError) {
+        throw new AggregateError(
+          [initializationError, disposalError],
+          'Service initialization failed and one or more created services failed to dispose.',
+        )
+      }
+
+      throw initializationError
+    }
   }
 
   private add<T>(
     token: ServiceToken<T>,
     lifetime: ServiceLifetime,
+    owned: boolean,
     create: ServiceFactory<T>,
   ): this {
     if (this.#registrations.has(token.key))
-      throw new Error(`Service '${token.name}' is already registered.`)
+      throw new ServiceRegistrationError(`Service '${token.name}' is already registered.`, token.name)
 
     this.#registrations.set(token.key, {
       create: create as ServiceFactory<unknown>,
       lifetime,
+      owned,
       token: token as ServiceToken<unknown>,
     })
     return this
@@ -124,6 +179,7 @@ export class ServiceContainer implements ServiceScopeResolver {
   readonly #scopedInstances = new Map<symbol, unknown>()
   readonly #singletonInstances = new Map<symbol, unknown>()
   readonly #disposables: Disposable[] = []
+  readonly #trackedDisposables = new Set<Disposable>()
   #disposed = false
 
   constructor(
@@ -142,15 +198,22 @@ export class ServiceContainer implements ServiceScopeResolver {
   getStable<T>(token: ServiceToken<T>): T {
     this.throwIfDisposed()
     const match = this.findRegistration(token)
-    if (match === null) throw new Error(`Service '${token.name}' is not registered.`)
+    if (match === null)
+      throw new ServiceResolutionError(`Service '${token.name}' is not registered.`, token.name)
     if (match.registration.lifetime === 'transient')
-      throw new Error(`Transient service '${token.name}' cannot be resolved during React render.`)
+      throw new ServiceResolutionError(
+        `Transient service '${token.name}' cannot be resolved during React render.`,
+        token.name,
+      )
 
     const instances = match.registration.lifetime === 'singleton'
       ? match.owner.#singletonInstances
       : this.#scopedInstances
     if (!instances.has(token.key))
-      throw new Error(`Stable service '${token.name}' was not initialized before React render.`)
+      throw new ServiceResolutionError(
+        `Stable service '${token.name}' was not initialized before React render.`,
+        token.name,
+      )
 
     return instances.get(token.key) as T
   }
@@ -165,8 +228,9 @@ export class ServiceContainer implements ServiceScopeResolver {
   /**
    * Releases every disposable instance this container created, in reverse creation order so a
    * consumer is torn down before the dependency it was built from. A container only disposes its
-   * own instances: disposing a scope never touches the parent's singletons. Idempotent — a second
-   * call is a no-op, which keeps React Strict Mode's setup/cleanup/setup cycle safe.
+   * own instances: disposing a scope never touches the parent's singletons, and disposing a parent
+   * invalidates but does not dispose its caller-owned child scopes. Idempotent — a second call is a
+   * no-op, which keeps React Strict Mode's setup/cleanup/setup cycle safe.
    */
   dispose(): void {
     if (this.#disposed) return
@@ -182,6 +246,7 @@ export class ServiceContainer implements ServiceScopeResolver {
     }
 
     this.#disposables.length = 0
+    this.#trackedDisposables.clear()
     this.#scopedInstances.clear()
     this.#singletonInstances.clear()
 
@@ -189,12 +254,24 @@ export class ServiceContainer implements ServiceScopeResolver {
       throw new AggregateError(errors, 'One or more services failed to dispose.')
   }
 
+  /**
+   * True once THIS container has been disposed and its retained instances released. A child whose
+   * ancestor was disposed still reports false here: it is unusable (see isUsable) but holds its
+   * resources until its owner calls dispose(). Guarding dispose() behind !isDisposed() is therefore
+   * always safe; guarding it behind !isUsable() would leak an invalidated child's resources.
+   */
   isDisposed(): boolean {
     return this.#disposed
   }
 
+  /** False once this container or any ancestor has been disposed; resolution then throws. */
+  isUsable(): boolean {
+    if (this.#disposed) return false
+    return this.#parent === null || this.#parent.isUsable()
+  }
+
   private throwIfDisposed(): void {
-    if (this.#disposed) throw new Error('This service scope has been disposed.')
+    if (!this.isUsable()) throw new ServiceScopeUnavailableError()
   }
 
   /**
@@ -217,12 +294,23 @@ export class ServiceContainer implements ServiceScopeResolver {
 
   private resolve<T>(token: ServiceToken<T>, stack: ResolutionFrame[]): T {
     const match = this.findRegistration(token)
-    if (match === null) throw new Error(`Service '${token.name}' is not registered.`)
+    if (match === null) {
+      const path = [...stack.map(frame => frame.token.name), token.name]
+      throw new ServiceResolutionError(
+        `Service '${token.name}' is not registered.`,
+        token.name,
+        path,
+      )
+    }
 
     const cycleIndex = stack.findIndex(frame => frame.token.key === token.key)
     if (cycleIndex >= 0) {
       const path = [...stack.slice(cycleIndex).map(frame => frame.token.name), token.name]
-      throw new Error(`Circular service dependency: ${path.join(' -> ')}.`)
+      throw new ServiceResolutionError(
+        `Circular service dependency: ${path.join(' -> ')}.`,
+        token.name,
+        path,
+      )
     }
 
     if (
@@ -230,13 +318,18 @@ export class ServiceContainer implements ServiceScopeResolver {
       && stack.some(frame => frame.lifetime === 'singleton')
     ) {
       const singleton = stack.find(frame => frame.lifetime === 'singleton')!
-      throw new Error(
+      const path = [...stack.map(frame => frame.token.name), token.name]
+      throw new ServiceResolutionError(
         `Singleton service '${singleton.token.name}' cannot depend on scoped service '${token.name}'.`,
+        token.name,
+        path,
       )
     }
 
-    if (match.registration.lifetime === 'singleton')
+    if (match.registration.lifetime === 'singleton') {
+      match.owner.throwIfDisposed()
       return match.owner.resolveCached(token, match.registration, stack, match.owner.#singletonInstances)
+    }
 
     if (match.registration.lifetime === 'scoped')
       return this.resolveCached(token, match.registration, stack, this.#scopedInstances)
@@ -256,7 +349,14 @@ export class ServiceContainer implements ServiceScopeResolver {
     instances.set(token.key, instance)
     // Retained singleton and scoped instances are disposed with this container. Transients skip
     // resolveCached, so the container never holds them and never disposes them.
-    if (isDisposable(instance)) this.#disposables.push(instance)
+    if (
+      registration.owned
+      && isDisposable(instance)
+      && !this.#trackedDisposables.has(instance)
+    ) {
+      this.#trackedDisposables.add(instance)
+      this.#disposables.push(instance)
+    }
     return instance
   }
 
@@ -269,7 +369,20 @@ export class ServiceContainer implements ServiceScopeResolver {
       get: <TDependency>(dependency: ServiceToken<TDependency>) =>
         this.resolve(dependency, nextStack),
     }
-    return registration.create(resolver) as T
+    try {
+      return registration.create(resolver) as T
+    } catch (error) {
+      if (error instanceof ServiceResolutionError || error instanceof ServiceScopeUnavailableError)
+        throw error
+
+      const path = nextStack.map(frame => frame.token.name)
+      throw new ServiceResolutionError(
+        `Failed to construct service '${registration.token.name}'.`,
+        registration.token.name,
+        path,
+        { cause: error },
+      )
+    }
   }
 
   private findRegistration<T>(token: ServiceToken<T>): RegistrationMatch | null {

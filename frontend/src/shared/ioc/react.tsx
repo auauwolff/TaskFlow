@@ -11,6 +11,7 @@ import {
 import type { ConfigureServices, ServiceScopeResolver, ServiceToken } from './core'
 
 const ServiceContext = createContext<ServiceScopeResolver | null>(null)
+const ManagedScopeContext = createContext(false)
 
 interface ServiceProviderProps extends PropsWithChildren {
   services: ServiceScopeResolver
@@ -22,7 +23,19 @@ interface ServiceScopeProviderProps extends PropsWithChildren {
 }
 
 export function ServiceProvider({ services, children }: ServiceProviderProps) {
-  return <ServiceContext value={services}>{children}</ServiceContext>
+  const initialServices = useRef(services)
+  if (initialServices.current !== services)
+    throw new Error('ServiceProvider services cannot change while mounted. Remount the provider instead.')
+  if (!services.isUsable())
+    throw new Error('ServiceProvider requires a usable service scope for its complete mounted lifetime.')
+
+  // An externally owned container resets the DI lineage for this subtree. Its caller guarantees
+  // stable identity and keeps the supplied scope and its ancestors alive until descendants unmount.
+  return (
+    <ManagedScopeContext value={false}>
+      <ServiceContext value={services}>{children}</ServiceContext>
+    </ManagedScopeContext>
+  )
 }
 
 export function ServiceScopeProvider({
@@ -30,15 +43,28 @@ export function ServiceScopeProvider({
   scopeKey = 'default',
   children,
 }: ServiceScopeProviderProps) {
+  const insideManagedScope = use(ManagedScopeContext)
+  if (insideManagedScope)
+    throw new Error(
+      'Nested ServiceScopeProvider components are not supported. Create the nested scope externally.',
+    )
+
   return (
-    <ServiceScope key={scopeKey} configure={configure}>
-      {children}
-    </ServiceScope>
+    <ManagedScopeContext value>
+      <ServiceScope key={scopeKey} configure={configure}>
+        {children}
+      </ServiceScope>
+    </ManagedScopeContext>
   )
 }
 
 function ServiceScope({ configure, children }: Omit<ServiceScopeProviderProps, 'scopeKey'>) {
   const parent = useRequiredServices()
+  const initialInputs = useRef({ configure, parent })
+  if (initialInputs.current.configure !== configure || initialInputs.current.parent !== parent)
+    throw new Error(
+      'ServiceScopeProvider inputs cannot change while mounted. Change scopeKey to remount it.',
+    )
   // Known limitation: Strict Mode double-invokes this initializer and discards one result, and
   // the discarded scope is never disposed — there is no React hook for "this render was thrown
   // away". The consequence is a rule, enforced by convention: scoped service constructors must

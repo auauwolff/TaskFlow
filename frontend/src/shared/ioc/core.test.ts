@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createServiceToken, ServiceCollection } from './core'
+import {
+  createServiceToken,
+  ServiceCollection,
+  ServiceRegistrationError,
+  ServiceResolutionError,
+  ServiceScopeUnavailableError,
+} from './core'
 
 describe('ServiceCollection', () => {
   it('resolves typed values', () => {
@@ -77,6 +83,14 @@ describe('ServiceCollection', () => {
       .toThrow("Service 'RequiredService' is already registered.")
     expect(() => new ServiceCollection().build().get(service))
       .toThrow("Service 'RequiredService' is not registered.")
+
+    try {
+      registrations.value(service, 'second')
+      expect.unreachable('Expected duplicate registration to throw.')
+    } catch (error) {
+      expect(error).toBeInstanceOf(ServiceRegistrationError)
+      expect(error).toMatchObject({ tokenName: 'RequiredService' })
+    }
   })
 
   it('reports circular dependency paths', () => {
@@ -112,6 +126,75 @@ describe('ServiceCollection', () => {
 
     expect(() => registrations.build())
       .toThrow("Singleton service 'Singleton' cannot depend on scoped service 'Scoped'.")
+  })
+
+  it('reports construction failures with the token and resolution path', () => {
+    const dependency = createServiceToken<object>('Dependency')
+    const consumer = createServiceToken<object>('Consumer')
+    const cause = new Error('Factory failed')
+    const registrations = new ServiceCollection()
+      .singleton(consumer, services => services.get(dependency))
+      .singleton(dependency, () => { throw cause })
+
+    try {
+      registrations.build()
+      expect.unreachable('Expected service construction to fail.')
+    } catch (error) {
+      expect(error).toBeInstanceOf(ServiceResolutionError)
+      expect(error).toMatchObject({
+        tokenName: 'Dependency',
+        resolutionPath: ['Consumer', 'Dependency'],
+        cause,
+      })
+    }
+  })
+
+  it('disposes services created before a later registration fails to initialize', () => {
+    const resource = createServiceToken<{ dispose(): void }>('Resource')
+    const failing = createServiceToken<object>('Failing')
+    const dispose = vi.fn()
+    const registrations = new ServiceCollection()
+      .singleton(resource, () => ({ dispose }))
+      .singleton(failing, () => { throw new Error('Factory failed') })
+
+    expect(() => registrations.build()).toThrow("Failed to construct service 'Failing'.")
+    expect(dispose).toHaveBeenCalledOnce()
+  })
+
+  it('disposes partial child scopes when initialization fails', () => {
+    const resource = createServiceToken<{ dispose(): void }>('Resource')
+    const failing = createServiceToken<object>('Failing')
+    const dispose = vi.fn()
+    const root = new ServiceCollection().build()
+
+    expect(() => root.createScope(services => services
+      .singleton(resource, () => ({ dispose }))
+      .singleton(failing, () => { throw new Error('Factory failed') })))
+      .toThrow("Failed to construct service 'Failing'.")
+    expect(dispose).toHaveBeenCalledOnce()
+  })
+
+  it('preserves initialization and rollback failures', () => {
+    const resource = createServiceToken<{ dispose(): void }>('Resource')
+    const failing = createServiceToken<object>('Failing')
+    const initializationCause = new Error('Factory failed')
+    const disposalCause = new Error('Disposal failed')
+    const registrations = new ServiceCollection()
+      .singleton(resource, () => ({ dispose: () => { throw disposalCause } }))
+      .singleton(failing, () => { throw initializationCause })
+
+    try {
+      registrations.build()
+      expect.unreachable('Expected service initialization to fail.')
+    } catch (error) {
+      expect(error).toBeInstanceOf(AggregateError)
+      expect(error).toMatchObject({
+        errors: [
+          expect.objectContaining({ cause: initializationCause }),
+          expect.objectContaining({ errors: [disposalCause] }),
+        ],
+      })
+    }
   })
 })
 
@@ -178,7 +261,62 @@ describe('ServiceContainer disposal', () => {
     const scope = new ServiceCollection().value(token, 'hi').build().createScope()
     scope.dispose()
 
-    expect(() => scope.get(token)).toThrow('This service scope has been disposed.')
+    expect(() => scope.get(token)).toThrow(ServiceScopeUnavailableError)
+  })
+
+  it('invalidates child scopes when their parent is disposed', () => {
+    const token = createServiceToken<object>('Singleton')
+    const create = vi.fn(() => ({}))
+    const root = new ServiceCollection().singleton(token, create).build()
+    const scope = root.createScope()
+
+    root.dispose()
+
+    expect(scope.isUsable()).toBe(false)
+    // Invalidated, not disposed: the child still owns its resources until ITS dispose() runs.
+    expect(scope.isDisposed()).toBe(false)
+    expect(() => scope.get(token)).toThrow(ServiceScopeUnavailableError)
+    expect(create).toHaveBeenCalledOnce()
+  })
+
+  it('leaves invalidated child resources for their owner to dispose', () => {
+    const token = createServiceToken<{ dispose(): void }>('Scoped')
+    const dispose = vi.fn()
+    const root = new ServiceCollection().scoped(token, () => ({ dispose })).build()
+    const scope = root.createScope()
+
+    root.dispose()
+
+    expect(dispose).toHaveBeenCalledOnce()
+
+    scope.dispose()
+
+    expect(dispose).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not dispose externally owned values', () => {
+    const token = createServiceToken<{ dispose(): void }>('ExternalValue')
+    const dispose = vi.fn()
+    const container = new ServiceCollection().value(token, { dispose }).build()
+
+    container.dispose()
+
+    expect(dispose).not.toHaveBeenCalled()
+  })
+
+  it('disposes an aliased owned instance only once', () => {
+    const first = createServiceToken<{ dispose(): void }>('First')
+    const second = createServiceToken<{ dispose(): void }>('Second')
+    const dispose = vi.fn()
+    const resource = { dispose }
+    const container = new ServiceCollection()
+      .singleton(first, () => resource)
+      .singleton(second, () => resource)
+      .build()
+
+    container.dispose()
+
+    expect(dispose).toHaveBeenCalledOnce()
   })
 
   it('never retains or disposes transient instances', () => {
