@@ -37,5 +37,9 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         // Email is a user's natural identifier — enforce uniqueness at the database level too,
         // not just in the application's "email already exists" check.
         builder.HasIndex(u => u.Email).IsUnique();
+
+        // Users have update behavior (rename, email change), so they get the same optimistic
+        // concurrency protection — see the full explanation on TaskItemConfiguration.
+        builder.Property<uint>("xmin").IsRowVersion();
     }
 }

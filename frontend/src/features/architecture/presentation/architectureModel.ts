@@ -531,7 +531,7 @@ export const architectureViews: Record<ArchitectureViewId, ArchitectureView> = {
     description: 'DI binds repository interfaces to EF implementations sharing one scoped DbContext and unit of work.',
     nodes: [
       file('di', 0, 100, 'DependencyInjection.cs', 'Composition', 'backend/src/TaskFlow.Infrastructure/DependencyInjection.cs', 'Registers DbContext, shared IUnitOfWork, and four repository implementations.', 'One scoped DbContext backs repositories and transaction commit.'),
-      file('dbcontext', 370, 100, 'TaskFlowDbContext.cs', 'Adapter', 'backend/src/TaskFlow.Infrastructure/Persistence/TaskFlowDbContext.cs', 'EF DbContext, DbSets, configuration scanning, and concrete IUnitOfWork.', 'Track aggregate changes and commit the same scoped graph.'),
+      file('dbcontext', 370, 100, 'TaskFlowDbContext.cs', 'Adapter', 'backend/src/TaskFlow.Infrastructure/Persistence/TaskFlowDbContext.cs', 'EF DbContext, DbSets, configuration scanning, and concrete IUnitOfWork. Translates optimistic-concurrency losses into the Application-owned ConflictException.', 'Track aggregate changes and commit the same scoped graph; EF exceptions never leave Infrastructure.'),
       node('repositories', 740, -80, {
         label: 'Repository implementations', kind: 'Adapter', level: 'Module', technology: '4 C# files',
         description: 'User, identity, project, and task EF repositories.',
@@ -539,7 +539,7 @@ export const architectureViews: Record<ArchitectureViewId, ArchitectureView> = {
       }),
       node('configurations', 740, 210, {
         label: 'Entity configurations', kind: 'Adapter', level: 'Module', technology: '4 C# files',
-        description: 'Tables, indexes, conversions, keys, and relational constraints.',
+        description: 'Tables, indexes, conversions, keys, constraints, and xmin optimistic-concurrency tokens.',
         responsibility: 'Relational mapping remains outside domain entities.', sourcePath: 'backend/src/TaskFlow.Infrastructure/Persistence/Configurations',
       }),
       node('migrations', 740, 500, {

@@ -27,5 +27,9 @@ internal sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
         // add a plain index on owner_id for fast "projects for this owner" lookups rather than a hard
         // foreign-key constraint. Cross-aggregate integrity is enforced in the application/domain.
         builder.HasIndex(p => p.OwnerId);
+
+        // Concurrent renames/description edits must not silently overwrite each other — see the
+        // full explanation on TaskItemConfiguration.
+        builder.Property<uint>("xmin").IsRowVersion();
     }
 }

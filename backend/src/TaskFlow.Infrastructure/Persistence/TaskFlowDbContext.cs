@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using TaskFlow.Application.Common.Exceptions;
 using TaskFlow.Application.Common.Interfaces;
 using TaskFlow.Domain.Entities;
 
@@ -22,6 +23,29 @@ public sealed class TaskFlowDbContext : DbContext, IUnitOfWork
     public DbSet<ExternalIdentity> ExternalIdentities => Set<ExternalIdentity>();
     public DbSet<Project> Projects => Set<Project>();
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
+
+    /// <summary>
+    /// Every SaveChanges overload funnels through this one, so this is the single place where an
+    /// optimistic-concurrency loss (the row's xmin changed since we read it — see the entity
+    /// configurations) is translated from EF's <see cref="DbUpdateConcurrencyException"/> into the
+    /// Application-owned <see cref="ConflictException"/>. Application code stays EF-free, and both
+    /// delivery adapters already know the exception: REST maps it to 409, GraphQL to CONFLICT.
+    /// </summary>
+    public override async Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            var entity = exception.Entries.FirstOrDefault()?.Metadata.ClrType.Name ?? "resource";
+            throw new ConflictException(
+                $"The {entity} was changed by another request since it was loaded. Reload it and retry.");
+        }
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
