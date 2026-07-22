@@ -47,12 +47,12 @@ flowchart LR
 The backend follows the Clean Architecture dependency rule: dependencies point inward and inner
 layers know nothing about delivery or persistence details.
 
-| Project | Depends on | Responsibility |
-| --- | --- | --- |
-| `TaskFlow.Domain` | Nothing | Entities, value objects, invariants, repository contracts |
-| `TaskFlow.Application` | Domain | Use cases, ports, DTOs, validation |
-| `TaskFlow.Infrastructure` | Application, Domain | EF Core, PostgreSQL, repository adapters, migrations |
-| `TaskFlow.Api` | Application, Infrastructure | Controllers, authentication, middleware, composition root |
+| Project                   | Depends on                  | Responsibility                                            |
+| ------------------------- | --------------------------- | --------------------------------------------------------- |
+| `TaskFlow.Domain`         | Nothing                     | Entities, value objects, invariants, repository contracts |
+| `TaskFlow.Application`    | Domain                      | Use cases, ports, DTOs, validation                        |
+| `TaskFlow.Infrastructure` | Application, Domain         | EF Core, PostgreSQL, repository adapters, migrations      |
+| `TaskFlow.Api`            | Application, Infrastructure | Controllers, authentication, middleware, composition root |
 
 Project references enforce these boundaries at compile time. ASP.NET is the composition root and
 wires the complete object graph through dependency injection.
@@ -139,13 +139,13 @@ Username: ada
 Password: taskflow
 ```
 
-| Service | URL |
-| --- | --- |
-| Frontend | `http://localhost:5173` |
-| API | `http://localhost:5131` |
-| Swagger | `http://localhost:5131/swagger` |
-| OpenAPI | `http://localhost:5131/openapi/v1.json` |
-| Keycloak | `http://localhost:8080` |
+| Service  | URL                                     |
+| -------- | --------------------------------------- |
+| Frontend | `http://localhost:5173`                 |
+| API      | `http://localhost:5131`                 |
+| Swagger  | `http://localhost:5131/swagger`         |
+| OpenAPI  | `http://localhost:5131/openapi/v1.json` |
+| Keycloak | `http://localhost:8080`                 |
 
 The committed credentials and OIDC client secret are for local development only.
 
@@ -193,3 +193,11 @@ investigation but become noisy, so they are supplemental rather than the primary
 - Run the Playwright journeys in CI with browser and Docker support.
 - Expose start/reopen task transitions when the UI needs a fuller workflow.
 - Add API/frontend containers and a production reverse proxy.
+
+claude --resume ab269e03-6841-4aab-8f62-cb8d1e525fef
+opencode -s ses_08c0511e5ffee3HP24O2WSWcck
+
+over this TaskFlow project I am trying to create this state of art architecture clean code repo which i am using as a base ground or testing for like having a very solid backend architecture with C# and .Net which I
+believe is quite solid at this stage and a frontend architecure which I am still trying to undertand and tweak I also took inspiration from hexagonal architucture patterns and the frontend code base over in
+MarineAid.Next so yea trying to build something whihc at this stage dont mattter the project size or what it is but something that I can use as reference for future projects that is escalable to entrerprise level
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
