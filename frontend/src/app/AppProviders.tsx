@@ -1,7 +1,6 @@
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { useEffect, type PropsWithChildren } from 'react'
-import { transitionToAnonymousSession } from '@/features/session/presentation/current-session/sessionCache'
-import { useSession } from '@/features/session/presentation/current-session/useSession'
+import { transitionToAnonymousSession, useSession } from '@/features/session'
 import { antiforgeryClientToken } from '@/shared/api/apiServices'
 import { ServiceProvider, useService } from '@/shared/ioc/react'
 import type { AppRuntime } from './composition'

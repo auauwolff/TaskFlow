@@ -1,0 +1,18 @@
+root = true
+
+[*.cs]
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+charset = utf-8
+
+# The solution is already 100% file-scoped. Promoting the preference to an error means the build
+# enforces it rather than the editor suggesting it - which is the point of EnforceCodeStyleInBuild.
+csharp_style_namespace_declarations = file_scoped:error
+
+# `dotnet ef migrations add` writes these files. They are machine output: reviewing them for style
+# is noise, and an analyzer cannot be satisfied without hand-editing a file the tool will rewrite.
+[**/Migrations/*.cs]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none
+dotnet_diagnostic.IDE0161.severity = none

@@ -1,4 +1,7 @@
 :root {
+  /* Tells the browser this page is dark, so native selects, scrollbars, autofill backgrounds and
+     form controls render dark too instead of light-on-dark. */
+  color-scheme: dark;
   color: #e8e5dc;
   background: #181a18;
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
@@ -9,6 +12,21 @@
 
 * {
   box-sizing: border-box;
+}
+
+/* One global keyboard-focus indicator. Inputs previously replaced `outline: none` with a
+   box-shadow, and box-shadow is not painted in forced-colors mode - so Windows High Contrast users
+   had no focus indicator anywhere in the app. `outline` is, which is why the reset happens here in
+   one place rather than per control. :focus-visible keeps it off mouse clicks. */
+:focus-visible {
+  outline: 2px solid #e8e5dc;
+  outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+  :focus-visible {
+    outline-color: Highlight;
+  }
 }
 
 body {

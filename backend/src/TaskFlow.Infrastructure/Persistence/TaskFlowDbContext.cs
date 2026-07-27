@@ -41,7 +41,10 @@ public sealed class TaskFlowDbContext : DbContext, IUnitOfWork
         }
         catch (DbUpdateConcurrencyException exception)
         {
-            var entity = exception.Entries.FirstOrDefault()?.Metadata.ClrType.Name ?? "resource";
+            // Entries is IReadOnlyList, so index it directly rather than going through LINQ (CA1826).
+            var entity = exception.Entries.Count > 0
+                ? exception.Entries[0].Metadata.ClrType.Name
+                : "resource";
             throw new ConflictException(
                 $"The {entity} was changed by another request since it was loaded. Reload it and retry.");
         }

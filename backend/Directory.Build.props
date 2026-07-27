@@ -1,0 +1,41 @@
+<Project>
+
+  <!--
+    Shared build configuration for every project in the solution.
+
+    Before this file existed, TargetFramework/Nullable/ImplicitUsings were copy-pasted into all six
+    csproj files, and the warnings-as-errors quality bar lived only as a command-line flag written
+    down in the README, which meant it applied whenever someone remembered to type it. Both are now
+    properties of the build itself.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!--
+      EnforceCodeStyleInBuild is the property most solutions omit: without it, the IDE* rules in
+      .editorconfig are honoured by the editor and ignored by the compiler, so an .editorconfig is
+      documentation rather than a gate.
+    -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <!--
+    BannedSymbols.txt turns "we always inject TimeProvider" from a convention into a compile error.
+    See that file for the list and the reasoning.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" />
+  </ItemGroup>
+
+</Project>

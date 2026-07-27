@@ -1,7 +1,8 @@
 import { QueryClient } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
 import type { ProjectsGateway } from '../../application/ports'
-import { projectId, type Project } from '../../domain/project'
+import { projectId } from '@/shared/domain/identity'
+import type { Project } from '../../domain/project'
 import { projectOptions } from './projectQueries'
 
 describe('project detail query', () => {

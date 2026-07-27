@@ -1,7 +1,8 @@
 import { QueryClient } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
 import type { SessionUseCases } from '../../application/sessionService'
-import { userId, type User } from '../../domain/user'
+import { userId } from '@/shared/domain/identity'
+import type { User } from '../../domain/user'
 import { currentSessionOptions } from './sessionQueries'
 
 const currentUser: User = {

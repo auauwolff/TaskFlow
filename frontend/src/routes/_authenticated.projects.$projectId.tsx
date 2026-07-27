@@ -1,6 +1,6 @@
 /* oxlint-disable react/only-export-components -- Route modules export TanStack's route contract. */
 import { createFileRoute } from '@tanstack/react-router'
-import { projectId } from '@/features/projects/domain/project'
+import { projectId } from '@/shared/domain/identity'
 import { ProjectDetail } from '@/features/projects/presentation/project-detail/ProjectDetail'
 import { addTasksWorkspaceScope } from '@/features/tasks/composition'
 import { TasksPage } from '@/features/tasks/presentation/TasksPage'

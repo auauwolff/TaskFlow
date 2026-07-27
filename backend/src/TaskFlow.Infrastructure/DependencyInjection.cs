@@ -8,8 +8,8 @@ using TaskFlow.Infrastructure.Persistence.Repositories;
 namespace TaskFlow.Infrastructure;
 
 /// <summary>
-/// Registers everything the Infrastructure layer provides. The Api (composition root, Phase 4) will
-/// call <c>services.AddInfrastructure(connectionString)</c>. This is the moment every port declared
+/// Registers everything the Infrastructure layer provides. The Api, as the composition root,
+/// calls <c>services.AddInfrastructure(connectionString)</c>. This is the moment every port declared
 /// by the inner layers (the repositories, the unit of work) gets matched to its concrete adapter.
 /// </summary>
 public static class DependencyInjection

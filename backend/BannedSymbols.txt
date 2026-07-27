@@ -1,0 +1,7 @@
+; Ambient clocks. Every timestamp in this solution is produced by an injected TimeProvider, which
+; is what makes the domain tests deterministic (see TestTimeProvider). That was previously a
+; convention maintained by memory; these four lines make a regression a compile error.
+P:System.DateTime.Now;Inject TimeProvider and call GetUtcNow() instead.
+P:System.DateTime.UtcNow;Inject TimeProvider and call GetUtcNow() instead.
+P:System.DateTimeOffset.Now;Inject TimeProvider and call GetUtcNow() instead.
+P:System.DateTimeOffset.UtcNow;Inject TimeProvider and call GetUtcNow() instead.

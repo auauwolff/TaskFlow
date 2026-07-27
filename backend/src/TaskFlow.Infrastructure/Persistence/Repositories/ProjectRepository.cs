@@ -25,6 +25,4 @@ internal sealed class ProjectRepository : IProjectRepository
 
     public async Task AddAsync(Project project, CancellationToken cancellationToken = default) =>
         await _db.Projects.AddAsync(project, cancellationToken);
-
-    public void Remove(Project project) => _db.Projects.Remove(project);
 }

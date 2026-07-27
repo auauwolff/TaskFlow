@@ -1,4 +1,5 @@
-import type { Project, ProjectId } from '../domain/project'
+import type { ProjectId } from '@/shared/domain/identity'
+import type { Project } from '../domain/project'
 
 export interface CreateProjectInput {
   name: string

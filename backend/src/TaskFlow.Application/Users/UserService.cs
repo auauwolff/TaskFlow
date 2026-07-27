@@ -11,7 +11,7 @@ namespace TaskFlow.Application.Users;
 /// handed in by the DI container. This class never calls <c>new</c> on a repository or a
 /// DbContext — it has no idea EF Core or Postgres exist. That's Dependency Injection and the
 /// Dependency Inversion Principle working together. The class is also trivially testable: pass
-/// fakes for these interfaces (Phase 5).
+/// fakes for these interfaces - see TaskFlow.Application.Tests.
 /// </summary>
 public sealed class UserService : IUserService
 {

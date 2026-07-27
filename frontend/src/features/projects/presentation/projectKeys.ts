@@ -1,4 +1,4 @@
-import type { ProjectId } from '../domain/project'
+import type { ProjectId } from '@/shared/domain/identity'
 
 export const projectKeys = {
   all: ['projects'] as const,

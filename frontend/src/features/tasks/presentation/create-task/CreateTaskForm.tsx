@@ -1,5 +1,5 @@
 import { useForm } from 'react-hook-form'
-import type { ProjectId } from '@/features/projects/domain/project'
+import type { ProjectId } from '@/shared/domain/identity'
 import type { TaskPriority } from '../../domain/task'
 import { useCreateTask } from './useCreateTask'
 

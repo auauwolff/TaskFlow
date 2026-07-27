@@ -22,6 +22,35 @@ app/composition
 Layers are created inside a feature only when that feature has code for them. Empty ceremonial
 layers are avoided.
 
+## Feature rule
+
+The dependency rule above governs the **layer axis** — how code is arranged *inside* one feature.
+It says nothing about how features relate to each other, and that is the boundary that actually
+decays as a codebase grows. Two rules govern the **feature axis**:
+
+**A feature imports another feature only through its `index.ts`.** A deep import couples the
+consumer to the other feature's internal folder layout, so moving a file becomes a cross-feature
+change. `features/session/index.ts` is the only session module another feature may name.
+`src/app` (the composition root) and `src/routes` (the page layer) are exempt: wiring features
+together and mounting pages is precisely their job, and pretending otherwise would mean inventing
+indirection to hide the composition root from the thing it composes.
+
+**Shared vocabulary lives in `shared/domain`, and holds vocabulary only.** A type belongs in the
+shared kernel when two or more features must agree on it to describe the same thing, and no single
+feature may change it unilaterally. `UserId` and `ProjectId` qualify — `Project.ownerId` being a
+`UserId` is not the session feature's private opinion. `TaskId` deliberately does not: no other
+feature needs to name a task, so it stays in `features/tasks/domain`. That asymmetry is the rule
+made visible. The kernel may not import a transport, a cache, or the container; the moment it can,
+it stops being vocabulary and becomes the junk drawer every shared kernel dies of.
+
+Both are enforced by `cross-feature-imports-use-the-front-door` and
+`shared-kernel-holds-vocabulary-not-logic` in `.dependency-cruiser.cjs`.
+
+> `tsPreCompilationDeps` is on. `import type` is erased at runtime but is still an architectural
+> dependency: a domain layer importing a type from another feature is coupled to it whether or not
+> the bundler can tell. With the flag off this config cruised 164 of 234 edges — it was measuring
+> the bundle rather than the design, and 16 of the 21 cross-feature imports were invisible to it.
+
 ## Composition and object style
 
 `createAppRuntime()` is the application composition root. It registers shared infrastructure, invokes
@@ -83,11 +112,18 @@ live in `.dependency-cruiser.cjs`, making the dependency rule executable rather 
 | Tasks returned by GraphQL | TanStack Query |
 | Current authenticated user | TanStack Query session cache |
 | OIDC protocol, tokens, and session cookie | ASP.NET authentication adapter |
-| Selected resource and shareable filters | Router path/search parameters |
+| Selected resource and shareable navigation state | Router path/search parameters |
 | Form values and validation | React Hook Form |
-| Project-scoped task filter | MobX view store |
+| Project-scoped task filter | MobX view store (see the note below) |
 | Other local interaction state | React |
 | Stable gateways and services | Typed IoC registrations through focused feature hooks |
+
+**Known inconsistency.** The task filter is shareable, bookmarkable state that survives a reload,
+which by the rules on this page makes it router search-param state. It currently lives in a MobX
+view store, so a deep link to `/projects/:id` loses the active filter. The store exists mainly to
+demonstrate the scoped-service pattern, which is a weak reason for it to own state the rules assign
+elsewhere. The intended resolution is to move the filter to `validateSearch` and retire the store;
+until that happens this row is a deviation, recorded rather than quietly tolerated.
 
 Server data is never copied into MobX. Projects, session, and tasks all use focused TanStack Query
 hooks over their feature gateway; the REST and GraphQL transports feed the same single server-state

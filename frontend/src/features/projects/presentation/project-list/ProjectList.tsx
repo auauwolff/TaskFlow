@@ -5,13 +5,19 @@ export function ProjectList() {
   const projects = useProjects()
 
   return (
-    <section className="project-section" aria-live="polite">
+    <section className="project-section">
       <div className="section-heading">
         <h2>Projects</h2>
         {projects.status === 'ready' ? <span>{projects.projects.length} total</span> : null}
       </div>
 
-      {projects.status === 'loading' ? <p className="muted-state">Loading projects...</p> : null}
+      {/* Live region scoped to the status sentence only - see the note in TaskList.tsx. */}
+      <div role="status">
+        {projects.status === 'loading' ? <p className="muted-state">Loading projects...</p> : null}
+        {projects.status === 'ready' && projects.projects.length === 0 ? (
+          <p className="muted-state">No projects yet. Make the first one.</p>
+        ) : null}
+      </div>
       {projects.status === 'error' ? (
         <div className="error-state">
           <p>{projects.message}</p>
@@ -19,9 +25,6 @@ export function ProjectList() {
             Try again
           </button>
         </div>
-      ) : null}
-      {projects.status === 'ready' && projects.projects.length === 0 ? (
-        <p className="muted-state">No projects yet. Make the first one.</p>
       ) : null}
       {projects.status === 'ready' && projects.projects.length > 0 ? (
         <ol className="project-list">

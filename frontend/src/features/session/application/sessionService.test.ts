@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { userId, type User } from '../domain/user'
+import { userId } from '@/shared/domain/identity'
+import type { User } from '../domain/user'
 import type { AuthenticationGateway } from './ports'
 import { SessionService } from './sessionService'
 

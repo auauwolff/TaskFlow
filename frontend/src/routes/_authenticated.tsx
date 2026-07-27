@@ -1,8 +1,9 @@
 /* oxlint-disable react/only-export-components -- Route modules export TanStack's route contract. */
 import { createFileRoute, Outlet } from '@tanstack/react-router'
-import { useSession } from '@/features/session/presentation/current-session/useSession'
+import { useSession, useSignOut } from '@/features/session'
+// SignInPage is imported directly, not through the front door: it is a page, and the page layer
+// mounts pages. Routing it through the barrel would defeat the router's code splitting.
 import { SignInPage } from '@/features/session/presentation/sign-in/SignInPage'
-import { useSignOut } from '@/features/session/presentation/sign-out/useSignOut'
 
 export const Route = createFileRoute('/_authenticated')({
   component: AuthenticatedLayout,

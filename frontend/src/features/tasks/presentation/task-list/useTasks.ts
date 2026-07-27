@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import type { ProjectId } from '@/features/projects/domain/project'
-import type { UserId } from '@/features/session/domain/user'
+import type { ProjectId } from '@/shared/domain/identity'
+import type { UserId } from '@/shared/domain/identity'
 import { errorMessage } from '@/shared/errors/appError'
 import type { TaskId, TaskPriority, TaskStatus } from '../../domain/task'
 import { useTasksGateway } from '../tasksGatewayService'

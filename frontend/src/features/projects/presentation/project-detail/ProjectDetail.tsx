@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import type { PropsWithChildren } from 'react'
-import type { ProjectId } from '../../domain/project'
+import type { ProjectId } from '@/shared/domain/identity'
 import { useProject } from './useProject'
 
 interface ProjectDetailProps extends PropsWithChildren {

@@ -7,8 +7,8 @@ using TaskFlow.Application.Users;
 namespace TaskFlow.Application;
 
 /// <summary>
-/// Each layer registers its OWN services in an extension method. The Api (the composition root,
-/// Phase 4) simply calls <c>services.AddApplication()</c>. This keeps the wiring next to the code
+/// Each layer registers its OWN services in an extension method. The Api, the composition root,
+/// simply calls <c>services.AddApplication()</c>. This keeps the wiring next to the code
 /// it wires, and means the Api doesn't have to know every concrete class that lives in here.
 /// </summary>
 public static class DependencyInjection
@@ -18,7 +18,7 @@ public static class DependencyInjection
         services.AddSingleton(TimeProvider.System);
 
         // Scoped = one instance per web request, the natural lifetime for use-case work.
-        // (We'll unpack Scoped vs Transient vs Singleton properly in Phase 4.)
+        // Scoped vs Transient vs Singleton is decided per service; see the Api composition root.
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<ITaskService, TaskService>();

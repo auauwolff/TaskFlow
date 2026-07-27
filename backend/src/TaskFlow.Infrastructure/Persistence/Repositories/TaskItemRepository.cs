@@ -23,6 +23,4 @@ internal sealed class TaskItemRepository : ITaskItemRepository
 
     public async Task AddAsync(TaskItem task, CancellationToken cancellationToken = default) =>
         await _db.Tasks.AddAsync(task, cancellationToken);
-
-    public void Remove(TaskItem task) => _db.Tasks.Remove(task);
 }

@@ -1,6 +1,6 @@
 import { observer } from 'mobx-react-lite'
-import type { ProjectId } from '@/features/projects/domain/project'
-import { useCurrentUser } from '@/features/session/presentation/current-session/useSession'
+import type { ProjectId } from '@/shared/domain/identity'
+import { useCurrentUser } from '@/features/session'
 import { useAssignTask } from '../assign-task/useAssignTask'
 import { useCompleteTask } from '../complete-task/useCompleteTask'
 import { useTasksWorkspaceViewStore } from '../tasksWorkspaceViewStoreService'
@@ -17,12 +17,14 @@ export const TaskList = observer(function TaskList({ projectId }: { projectId: P
     : []
 
   return (
-    <section className="project-section" aria-live="polite">
+    <section className="project-section">
       <div className="section-heading">
         <h2>Tasks</h2>
         {tasks.status === 'ready' ? <span>{tasks.tasks.length} total</span> : null}
       </div>
-      <div className="inline-actions" aria-label="Filter tasks">
+      {/* role="group" is required for aria-label to apply: on a role-less div most assistive
+          technology drops the label, so "Filter tasks" was not being announced at all. */}
+      <div className="inline-actions" role="group" aria-label="Filter tasks">
         {(['all', 'open', 'completed'] as const).map(filter => (
           <button
             className="text-button"
@@ -36,18 +38,23 @@ export const TaskList = observer(function TaskList({ projectId }: { projectId: P
         ))}
       </div>
 
-      {tasks.status === 'loading' ? <p className="muted-state">Loading tasks...</p> : null}
+      {/* Only the status sentence is a live region, and the container is always present so the
+          region exists before content is inserted into it. aria-live previously sat on the whole
+          <section>, which meant every filter click re-announced the heading and all task rows. */}
+      <div role="status">
+        {tasks.status === 'loading' ? <p className="muted-state">Loading tasks...</p> : null}
+        {tasks.status === 'ready' && tasks.tasks.length === 0 ? (
+          <p className="muted-state">No tasks yet. Add the first one.</p>
+        ) : null}
+        {tasks.status === 'ready' && tasks.tasks.length > 0 && visibleTasks.length === 0 ? (
+          <p className="muted-state">No tasks match this filter.</p>
+        ) : null}
+      </div>
       {tasks.status === 'error' ? (
         <div className="error-state">
           <p>{tasks.message}</p>
           <button className="text-button" type="button" onClick={tasks.retry}>Try again</button>
         </div>
-      ) : null}
-      {tasks.status === 'ready' && tasks.tasks.length === 0 ? (
-        <p className="muted-state">No tasks yet. Add the first one.</p>
-      ) : null}
-      {tasks.status === 'ready' && tasks.tasks.length > 0 && visibleTasks.length === 0 ? (
-        <p className="muted-state">No tasks match this filter.</p>
       ) : null}
       {tasks.status === 'ready' && visibleTasks.length > 0 ? (
         <ol className="task-list">
@@ -77,22 +84,22 @@ export const TaskList = observer(function TaskList({ projectId }: { projectId: P
                     <button
                       className="text-button"
                       type="button"
-                      disabled={completion.completingId === task.id}
+                      disabled={completion.isCompleting(task.id)}
                       onClick={() => completion.complete(task.id)}
                       aria-label={`Complete task: ${task.title}`}
                     >
-                      {completion.completingId === task.id ? 'Completing...' : 'Complete'}
+                      {completion.isCompleting(task.id) ? 'Completing...' : 'Complete'}
                     </button>
                   )}
                   {task.assigneeId === currentUser.id ? null : (
                     <button
                       className="text-button"
                       type="button"
-                      disabled={assignment.assigningId === task.id}
+                      disabled={assignment.isAssigning(task.id)}
                       onClick={() => assignment.assign(task.id, currentUser.id)}
                       aria-label={`Assign task to ${currentUser.name}: ${task.title}`}
                     >
-                      {assignment.assigningId === task.id ? 'Assigning...' : 'Assign to me'}
+                      {assignment.isAssigning(task.id) ? 'Assigning...' : 'Assign to me'}
                     </button>
                   )}
                 </div>

@@ -1,11 +1,12 @@
-import { userId } from '@/features/session/domain/user'
+import { userId } from '@/shared/domain/identity'
 import { apiError, networkError } from '@/shared/api/apiError'
 import { clearIfTokenRejected, type AntiforgeryClient } from '@/shared/api/antiforgery'
 import type { ApiClient } from '@/shared/api/client'
 import type { components } from '@/shared/api/schema'
 import { AppError } from '@/shared/errors/appError'
 import type { CreateProjectInput, ProjectsGateway } from '../application/ports'
-import { projectId, type Project, type ProjectId } from '../domain/project'
+import { projectId, type ProjectId } from '@/shared/domain/identity'
+import type { Project } from '../domain/project'
 
 type ProjectDto = components['schemas']['ProjectDto']
 

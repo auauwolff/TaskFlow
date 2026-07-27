@@ -1,6 +1,6 @@
 import { guidIdentifier } from '@/shared/domain/identifier'
-import type { ProjectId } from '@/features/projects/domain/project'
-import type { UserId } from '@/features/session/domain/user'
+import type { ProjectId } from '@/shared/domain/identity'
+import type { UserId } from '@/shared/domain/identity'
 
 declare const taskIdBrand: unique symbol
 

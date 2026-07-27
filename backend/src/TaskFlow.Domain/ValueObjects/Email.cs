@@ -28,7 +28,7 @@ public sealed class Email : ValueObject
             throw new DomainException("Email cannot exceed 320 characters.");
 
         // Deliberately minimal — exactly one '@', not at the very start or end. Heavier,
-        // user-facing validation belongs in the Application layer's validators (Phase 2).
+        // user-facing validation belongs in the Application layer's FluentValidation validators.
         var at = value.IndexOf('@');
         if (at <= 0 || at != value.LastIndexOf('@') || at == value.Length - 1)
             throw new DomainException($"'{value}' is not a valid email address.");

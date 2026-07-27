@@ -1,5 +1,5 @@
-import { projectId, type ProjectId } from '@/features/projects/domain/project'
-import { userId, type UserId } from '@/features/session/domain/user'
+import { projectId, type ProjectId } from '@/shared/domain/identity'
+import { userId, type UserId } from '@/shared/domain/identity'
 import { AppError } from '@/shared/errors/appError'
 import type { GraphqlClient } from '@/shared/graphql/client'
 import { graphql } from '@/shared/graphql/generated'

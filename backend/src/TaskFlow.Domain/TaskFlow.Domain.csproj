@@ -1,9 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+  <!--
+    Deliberately empty. The Domain layer has no package references and no build properties of its
+    own - everything is inherited from backend/Directory.Build.props. An empty csproj is the most
+    concise possible statement of the dependency rule: this layer depends on nothing.
+  -->
 
 </Project>

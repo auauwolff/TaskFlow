@@ -1,4 +1,4 @@
-import type { ProjectId } from '@/features/projects/domain/project'
+import type { ProjectId } from '@/shared/domain/identity'
 import { CreateTaskForm } from './create-task/CreateTaskForm'
 import { TaskList } from './task-list/TaskList'
 

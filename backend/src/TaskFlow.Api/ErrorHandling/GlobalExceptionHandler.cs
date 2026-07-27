@@ -7,10 +7,20 @@ using TaskFlow.Domain.Exceptions;
 
 namespace TaskFlow.Api.ErrorHandling;
 
-public sealed class GlobalExceptionHandler(
+public sealed partial class GlobalExceptionHandler(
     IProblemDetailsService problemDetailsService,
     ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {
+    // Source-generated logging: the [LoggerMessage] generator emits a cached delegate, so the
+    // message template is parsed once at startup rather than on every call, and no object[] is
+    // allocated for the arguments. `partial` on the class is what lets the generator contribute
+    // the method body.
+    [LoggerMessage(
+        EventId = 1000,
+        Level = LogLevel.Error,
+        Message = "An unhandled exception occurred while processing the request")]
+    private static partial void LogUnhandledException(ILogger logger, Exception exception);
+
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext,
         Exception exception,
@@ -20,7 +30,7 @@ public sealed class GlobalExceptionHandler(
         httpContext.Response.StatusCode = problemDetails.Status ?? StatusCodes.Status500InternalServerError;
 
         if (httpContext.Response.StatusCode >= StatusCodes.Status500InternalServerError)
-            logger.LogError(exception, "An unhandled exception occurred while processing the request");
+            LogUnhandledException(logger, exception);
 
         return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
         {
@@ -46,6 +56,10 @@ public sealed class GlobalExceptionHandler(
             StatusCodes.Status400BadRequest,
             "A business rule was violated",
             exception.Message),
+        UnauthenticatedException => CreateProblem(
+            StatusCodes.Status401Unauthorized,
+            "Authentication required",
+            "The request requires an authenticated TaskFlow user."),
         NotFoundException => CreateProblem(
             StatusCodes.Status404NotFound,
             "Resource not found",

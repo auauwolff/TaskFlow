@@ -1,6 +1,7 @@
 import { clearIfTokenRejected, type AntiforgeryClient } from '@/shared/api/antiforgery'
 import { apiError, networkError } from '@/shared/api/apiError'
 import { AppError } from '@/shared/errors/appError'
+import { graphqlError, type GraphqlErrorLike } from './graphqlError'
 import type { TypedDocumentString } from './generated/graphql'
 
 export interface GraphqlClient {
@@ -19,7 +20,7 @@ interface GraphqlClientOptions {
 
 interface GraphqlPayload<TData> {
   data?: TData
-  errors?: readonly { readonly message: string }[]
+  errors?: readonly GraphqlErrorLike[]
 }
 
 // A deliberately tiny GraphQL transport: a GraphQL request is just a typed POST.
@@ -60,8 +61,14 @@ export function createGraphqlClient({
         const payload = (await response.json()) as GraphqlPayload<TData>
         // Policy: the first error message is the user-facing failure and partial data is
         // discarded — gateways map complete DTOs to domain objects and never patch holes.
-        if (payload.errors !== undefined && payload.errors.length > 0)
-          throw new AppError(payload.errors[0].message, 'unexpected')
+        // A GraphQL error is transported in a 200 response, so this is also the only place a
+        // resolver-level 401 can be observed; the REST client gets the equivalent from its
+        // openapi-fetch onResponse middleware.
+        if (payload.errors !== undefined && payload.errors.length > 0) {
+          const failure = graphqlError(payload.errors)
+          if (failure.kind === 'unauthorized') onUnauthorized()
+          throw failure
+        }
         if (payload.data === undefined)
           throw new AppError('The GraphQL API returned an empty response.', 'unexpected')
 

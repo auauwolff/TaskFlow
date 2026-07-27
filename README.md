@@ -7,6 +7,19 @@ The domain is intentionally simple: `User -> Project -> TaskItem`. The focus is 
 boundaries, dependency inversion, testable use cases, provider-neutral authentication, and clear
 state ownership rather than feature volume.
 
+## Why this repo exists
+
+This is a reference, not a product. It exists to be a place I can point at in an architecture
+discussion, and the place I look first when starting a real project that has to scale.
+
+The backend is the part I consider settled. The frontend architecture is the part I am still
+working out, taking cues from hexagonal ports-and-adapters and from the patterns in a large Nx
+monorepo I work in day to day. The size of the domain is deliberate and beside the point: the
+question this repo answers is "what shape should the boundaries be", not "what can the app do".
+
+Every notable decision is recorded with its reasoning, including the ones where the answer was to
+*not* add something. The rejections are as much the content as the code.
+
 ## Status
 
 The backend, OIDC authentication, project/task workflows, deep-linkable project workspaces, and
@@ -151,8 +164,13 @@ The committed credentials and OIDC client secret are for local development only.
 
 ## Quality Gates
 
+`backend/Directory.Build.props` sets `TreatWarningsAsErrors`, `EnableNETAnalyzers` and
+`EnforceCodeStyleInBuild`, so the bar is part of the build rather than a flag you have to remember.
+`backend/BannedSymbols.txt` makes reaching for an ambient clock instead of `TimeProvider` a compile
+error.
+
 ```bash
-dotnet build backend/TaskFlow.slnx --warnaserror
+dotnet build backend/TaskFlow.slnx
 dotnet test backend/TaskFlow.slnx
 
 pnpm --dir frontend lint
@@ -190,14 +208,14 @@ investigation but become noisy, so they are supplemental rather than the primary
 
 ## Next Steps
 
-- Run the Playwright journeys in CI with browser and Docker support.
+- Add a CI workflow so the quality gates above run on every push, including a contract-drift job
+  that re-exports the GraphQL SDL and OpenAPI document and fails on a diff.
+- Add integration tests over a Testcontainers PostgreSQL instance. The headline persistence
+  behaviours — the `Email` value-converter round trip and the `xmin` concurrency token — are
+  currently asserted in prose here and nowhere in code.
+- Surface the concurrency token in the task and project DTOs so a client can participate in
+  optimistic concurrency; today `AppError`'s `conflict` kind has no producer a user can reach.
+- Move the task filter to router search params and retire the single MobX store, per the state
+  ownership rules in `frontend/ARCHITECTURE.md`.
 - Expose start/reopen task transitions when the UI needs a fuller workflow.
 - Add API/frontend containers and a production reverse proxy.
-
-claude --resume ab269e03-6841-4aab-8f62-cb8d1e525fef
-opencode -s ses_08c0511e5ffee3HP24O2WSWcck
-
-over this TaskFlow project I am trying to create this state of art architecture clean code repo which i am using as a base ground or testing for like having a very solid backend architecture with C# and .Net which I
-believe is quite solid at this stage and a frontend architecure which I am still trying to undertand and tweak I also took inspiration from hexagonal architucture patterns and the frontend code base over in
-MarineAid.Next so yea trying to build something whihc at this stage dont mattter the project size or what it is but something that I can use as reference for future projects that is escalable to entrerprise level
-─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────

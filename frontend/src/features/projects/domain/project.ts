@@ -1,9 +1,4 @@
-import { guidIdentifier } from '@/shared/domain/identifier'
-import type { UserId } from '@/features/session/domain/user'
-
-declare const projectIdBrand: unique symbol
-
-export type ProjectId = string & { readonly [projectIdBrand]: true }
+import type { ProjectId, UserId } from '@/shared/domain/identity'
 
 export interface Project {
   id: ProjectId
@@ -12,5 +7,3 @@ export interface Project {
   ownerId: UserId
   createdAt: Date
 }
-
-export const projectId = guidIdentifier<ProjectId>('project ID')

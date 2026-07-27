@@ -12,8 +12,4 @@ public interface IProjectRepository
     Task<Project?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Project>> ListByOwnerAsync(Guid ownerId, CancellationToken cancellationToken = default);
     Task AddAsync(Project project, CancellationToken cancellationToken = default);
-
-    // Remove is synchronous: it only marks the entity for deletion in memory. The actual
-    // database write happens later, via the Unit of Work's SaveChanges (Phase 2/3).
-    void Remove(Project project);
 }

@@ -1,7 +1,8 @@
 import { QueryClient } from '@tanstack/react-query'
 import { describe, expect, it } from 'vitest'
 import { authenticatedQueryMeta } from '@/shared/query/authenticatedQueries'
-import { userId, type User } from '../../domain/user'
+import { userId } from '@/shared/domain/identity'
+import type { User } from '../../domain/user'
 import { transitionToAnonymousSession } from './sessionCache'
 import { sessionKeys } from './sessionQueries'
 

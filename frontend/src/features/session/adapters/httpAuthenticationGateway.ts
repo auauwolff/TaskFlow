@@ -4,7 +4,8 @@ import type { AntiforgeryClient } from '@/shared/api/antiforgery'
 import type { components } from '@/shared/api/schema'
 import { AppError } from '@/shared/errors/appError'
 import type { AuthenticationGateway } from '../application/ports'
-import { userId, type User } from '../domain/user'
+import { userId } from '@/shared/domain/identity'
+import type { User } from '../domain/user'
 
 type UserDto = components['schemas']['UserDto']
 

@@ -1,5 +1,5 @@
-import type { ProjectId } from '@/features/projects/domain/project'
-import type { UserId } from '@/features/session/domain/user'
+import type { ProjectId } from '@/shared/domain/identity'
+import type { UserId } from '@/shared/domain/identity'
 import type { Task, TaskId, TaskPriority } from '../domain/task'
 
 export interface CreateTaskInput {

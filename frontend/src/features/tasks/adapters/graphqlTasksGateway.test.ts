@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { projectId } from '@/features/projects/domain/project'
+import { projectId } from '@/shared/domain/identity'
 import type { GraphqlClient } from '@/shared/graphql/client'
 import type { TypedDocumentString } from '@/shared/graphql/generated/graphql'
 import { GraphqlTasksGateway } from './graphqlTasksGateway'

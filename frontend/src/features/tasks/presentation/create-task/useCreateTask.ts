@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { ProjectId } from '@/features/projects/domain/project'
+import type { ProjectId } from '@/shared/domain/identity'
 import { errorMessage } from '@/shared/errors/appError'
 import type { TaskPriority } from '../../domain/task'
 import { taskKeys } from '../taskKeys'
