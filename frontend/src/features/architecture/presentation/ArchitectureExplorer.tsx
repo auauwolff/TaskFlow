@@ -16,6 +16,8 @@ import {
   architectureViews,
   primaryViewOrder,
   sourceUrl,
+  viewChildren,
+  viewCounterfactual,
   type ArchitectureNodeData,
   type ArchitectureView,
   type ArchitectureViewId,
@@ -152,22 +154,6 @@ function SourceViewer({ source, sourcePath, focus }: { source: string; sourcePat
   )
 }
 
-const viewChildren: Partial<Record<ArchitectureViewId, { id: ArchitectureViewId; label: string }[]>> = {
-  frontend: [
-    { id: 'frontend-nutshell', label: 'In a nutshell' },
-    { id: 'frontend-composition', label: 'Composition / DI' },
-    { id: 'frontend-session', label: 'Session feature' },
-    { id: 'frontend-projects', label: 'Projects feature' },
-    { id: 'frontend-tasks', label: 'Tasks feature' },
-  ],
-  backend: [
-    { id: 'backend-api', label: 'API project' },
-    { id: 'backend-application', label: 'Application project' },
-    { id: 'backend-domain', label: 'Domain project' },
-    { id: 'backend-infrastructure', label: 'Infrastructure project' },
-  ],
-}
-
 function topLevelViewId(viewId: ArchitectureViewId) {
   let current = architectureViews[viewId]
 
@@ -186,6 +172,10 @@ export function ArchitectureExplorer() {
   const [layoutNodes, setLayoutNodes, onNodesChange] = useNodesState(view.nodes)
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance<Node<ArchitectureNodeData>>>()
   const activeTopLevelViewId = topLevelViewId(viewId)
+  const counterfactual = viewCounterfactual[viewId]
+  // You are standing in the counterfactual when the view it toggles to is also the view you came
+  // from - which is only true of the "without" side of the pair.
+  const isCounterfactual = counterfactual !== undefined && view.parent === counterfactual.id
   const selectedNode = view.nodes.find((node) => node.id === selectedId) ?? null
   const selectedSourcePath = selectedNode?.data.sourcePath
   const selectedSource = getSourceCode(selectedSourcePath)
@@ -333,14 +323,13 @@ export function ArchitectureExplorer() {
           <div className="architecture-canvas__actions">
             <div className="architecture-hint">Drag to arrange / Click for dependencies / Double-click to explore</div>
             <button className="architecture-reset" type="button" onClick={resetLayout}>Reset layout</button>
-            {viewId === 'di-inversion' && (
-              <button className="architecture-reset architecture-counterfactual" type="button" onClick={() => openView('di-inversion-without')}>
-                Delete the port
-              </button>
-            )}
-            {viewId === 'di-inversion-without' && (
-              <button className="architecture-reset architecture-counterfactual is-active" type="button" onClick={() => openView('di-inversion')}>
-                Restore the port
+            {counterfactual === undefined ? null : (
+              <button
+                className={`architecture-reset architecture-counterfactual${isCounterfactual ? ' is-active' : ''}`}
+                type="button"
+                onClick={() => openView(counterfactual.id)}
+              >
+                {counterfactual.label}
               </button>
             )}
           </div>

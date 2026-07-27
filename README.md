@@ -39,8 +39,9 @@ pnpm --dir frontend dev
 Then open <http://localhost:5173/architecture>. Start from the complete full-stack map, select any
 node to isolate its dependencies and consumers, then drill from frontend/backend projects into layers,
 modules, dependency-injection wiring, and concrete source files.
-Dedicated sign-in and task-request lenses animate the important end-to-end paths. Source links in the
-inspector connect conceptual nodes back to their implementation. See
+A sign-in lens animates the end-to-end authentication path, and a dependency-inversion lens follows one
+port through both arrow systems with a toggle that deletes the port to show what it was buying. Source
+links in the inspector connect conceptual nodes back to their implementation. See
 [`frontend/ARCHITECTURE-EXPLORER.md`](frontend/ARCHITECTURE-EXPLORER.md) for the interaction guide.
 
 ```mermaid
@@ -178,6 +179,10 @@ pnpm --dir frontend architecture
 pnpm --dir frontend test
 pnpm --dir frontend build
 ```
+
+The frontend suite includes `architectureModel.test.ts`, which holds the interactive explorer to the
+codebase it claims to describe: every source link must resolve, every highlighted snippet must still
+exist in its file, and every view must be reachable. A diagram nobody can trust is worse than none.
 
 The browser suite uses isolated, disposable PostgreSQL and Keycloak containers:
 

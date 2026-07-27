@@ -178,22 +178,30 @@ export const architectureViews: Record<ArchitectureViewId, ArchitectureView> = {
       node('session', 680, -100, {
         label: 'Session feature', kind: 'Application', level: 'Module', technology: 'domain / application / adapters / presentation',
         description: 'Provider-neutral session restoration, sign-in, sign-out, and authenticated cache cleanup.',
-        responsibility: 'Own current-user vocabulary and authentication use cases.', sourcePath: 'frontend/src/features/session', drilldown: 'frontend-session',
+        responsibility: 'Own authentication use cases, and publish exactly one importable surface: index.ts.', sourcePath: 'frontend/src/features/session', drilldown: 'frontend-session',
       }),
       node('projects', 680, 170, {
         label: 'Projects feature', kind: 'Application', level: 'Module', technology: 'domain / application / adapters / presentation',
-        description: 'Project list, detail, creation, domain IDs, and HTTP gateway.',
-        responsibility: 'Own project capability and expose ProjectId to dependent features.', sourcePath: 'frontend/src/features/projects', drilldown: 'frontend-projects',
+        description: 'Project list, detail, creation, and the HTTP gateway.',
+        responsibility: 'Own the project capability. Its identity vocabulary is borrowed from the kernel, not declared here.', sourcePath: 'frontend/src/features/projects', drilldown: 'frontend-projects',
       }),
       node('tasks', 680, 440, {
         label: 'Tasks feature', kind: 'Application', level: 'Module', technology: 'domain / application / adapters / presentation',
         description: 'Task list, creation, assignment, completion, and transport mapping.',
-        responsibility: 'Depend on project and user domain vocabulary, not their adapters.', sourcePath: 'frontend/src/features/tasks', drilldown: 'frontend-tasks',
+        responsibility: 'Name projects and users through the kernel; reach session only through its front door.', sourcePath: 'frontend/src/features/tasks', drilldown: 'frontend-tasks',
       }),
       node('shared', 1050, 170, {
         label: 'Shared infrastructure', kind: 'Adapter', level: 'Module', technology: 'OpenAPI / GraphQL / cache policy',
         description: 'Typed REST and GraphQL transports, antiforgery policy, generated schema, and shared error normalization.',
         responsibility: 'May not import app or feature code.', sourcePath: 'frontend/src/shared',
+      }),
+      // The feature axis made visible. Without this node the graph implies features borrow
+      // vocabulary from each other, which is exactly the coupling the kernel was extracted to end.
+      node('kernel', 1050, 440, {
+        label: 'Shared identity kernel', kind: 'Domain', level: 'Module', technology: 'shared/domain',
+        description: 'UserId and ProjectId: the words more than one feature must agree on so they can describe the same thing, owned by none of them.',
+        responsibility: 'Holds vocabulary, never behaviour. It may not import a transport, a cache, or the container.',
+        sourcePath: 'frontend/src/shared/domain',
       }),
     ],
     edges: [
@@ -211,9 +219,14 @@ export const architectureViews: Record<ArchitectureViewId, ArchitectureView> = {
       edge('routes-tasks', 'routes', 'tasks', 'renders'),
       edge('session-shared', 'session', 'shared', 'HTTP + Query'),
       edge('projects-shared', 'projects', 'shared', 'HTTP + Query'),
-      edge('tasks-projects', 'tasks', 'projects', 'ProjectId'),
-      edge('tasks-session', 'tasks', 'session', 'UserId + current user'),
       edge('tasks-shared', 'tasks', 'shared', 'GraphQL + Query'),
+      // There is no tasks -> projects edge. Tasks name a ProjectId constantly, but they take that
+      // word from the kernel, so the two features never touch. The single surviving feature-to-
+      // feature dependency in the codebase is the one below, and it goes through index.ts.
+      edge('tasks-session', 'tasks', 'session', 'useCurrentUser, via index.ts'),
+      edge('session-kernel', 'session', 'kernel', 'UserId'),
+      edge('projects-kernel', 'projects', 'kernel', 'ProjectId + UserId'),
+      edge('tasks-kernel', 'tasks', 'kernel', 'ProjectId + UserId'),
     ],
   },
 
@@ -301,7 +314,7 @@ export const architectureViews: Record<ArchitectureViewId, ArchitectureView> = {
       file('ioc-react', 630, 130, 'ioc/react.tsx', 'Composition', 'frontend/src/shared/ioc/react.tsx', 'Bridges the immutable resolver through React 19 Context, useService, and inherited subtree scopes.', 'Root singletons flow globally; route or module providers isolate scoped services.'),
       file('route-tree', 630, 390, 'routeTree.gen.ts', 'Presentation', 'frontend/src/routeTree.gen.ts', 'Generated route registry consumed by main.tsx.', 'Generated output; route source files remain the editable contracts.'),
       file('api-client', 960, -280, 'client.ts', 'Adapter', 'frontend/src/shared/api/client.ts', 'Creates the typed OpenAPI client and centralizes the 401 callback.', 'Transport primitive shared by the REST gateways.'),
-      file('graphql-client', 630, -380, 'graphql/client.ts', 'Adapter', 'frontend/src/shared/graphql/client.ts', 'Fetch-based GraphQL transport with the CSRF header and 401 policy baked into every request.', 'Transport primitive shared by the GraphQL gateways.'),
+      file('graphql-client', 630, -380, 'graphql/client.ts', 'Adapter', 'frontend/src/shared/graphql/client.ts', 'Fetch-based GraphQL transport with the CSRF header and 401 policy baked into every request. Resolver errors are translated through the same code-to-AppError table the REST client uses, so a conflict is a conflict whichever transport reported it.', 'Transport primitive shared by the GraphQL gateways.', 'const failure = graphqlError(payload.errors)'),
       file('antiforgery', 1290, -300, 'antiforgery.ts', 'Adapter', 'frontend/src/shared/api/antiforgery.ts', 'Fetches and memoizes one CSRF token through the REST client.', 'One token fetch serves every mutating transport.'),
       file('project-route', 630, 620, 'projects.$projectId.tsx', 'Presentation', 'frontend/src/routes/_authenticated.projects.$projectId.tsx', 'Wraps the project workspace in a ServiceScopeProvider keyed by the selected project.', 'Scoped services live exactly as long as the workspace they serve.', 'ServiceScopeProvider scopeKey={selectedProjectId}'),
       file('session-module', 960, -80, 'session/composition.ts', 'Composition', 'frontend/src/features/session/composition.ts', 'Registers authentication adapter and SessionService.', 'Own the session feature object graph.'),
@@ -338,9 +351,11 @@ export const architectureViews: Record<ArchitectureViewId, ArchitectureView> = {
 
   'frontend-session': {
     id: 'frontend-session', parent: 'frontend', label: 'Session files', eyebrow: 'Frontend / session feature', title: 'Authentication behind an application port.',
-    description: 'Follow the static dependency direction from presentation and adapter toward application and domain files.',
+    description: 'Follow the static dependency direction from presentation and adapter toward application and domain files. Everything here is internal except index.ts, the one module another feature may name.',
     nodes: [
-      file('domain', 980, 140, 'user.ts', 'Domain', 'frontend/src/features/session/domain/user.ts', 'Defines branded UserId and the transport-independent User model.', 'No React, HTTP, or application dependencies.'),
+      file('consumer', -400, 20, 'TaskList.tsx', 'Presentation', 'frontend/src/features/tasks/presentation/task-list/TaskList.tsx', 'A file in another feature — the only cross-feature importer in the codebase. It needs to know who is signed in so it can offer "assign to me".', 'Reaches session through the published surface, never past it.', "from '@/features/session'"),
+      file('door', -60, 20, 'index.ts', 'Application', 'frontend/src/features/session/index.ts', 'The front door: the feature\'s public API. Six named exports, and everything else stays private, so the folder layout below can be rearranged without touching a consumer. SignInPage is deliberately absent — it is a page, mounted by the route layer, and re-exporting it here would drag it into the chunk of every feature that only wanted a hook.', 'Turn a folder into a module with a contract.', 'export { useCurrentUser'),
+      file('domain', 980, 140, 'user.ts', 'Domain', 'frontend/src/features/session/domain/user.ts', 'Defines the transport-independent User model. UserId is no longer declared here: projects and tasks both need that word, so it moved to the shared kernel rather than making them depend on session to say it.', 'No React, HTTP, or application dependencies.'),
       file('port', 650, 20, 'ports.ts', 'Application', 'frontend/src/features/session/application/ports.ts', 'Defines AuthenticationGateway.', 'The inner layer owns the contract implemented by HTTP.'),
       file('service', 650, 260, 'sessionService.ts', 'Application', 'frontend/src/features/session/application/sessionService.ts', 'Exposes session use cases and delegates to the authentication port.', 'Presentation depends on use cases, not the adapter.'),
       file('adapter', 300, 20, 'httpAuthenticationGateway.ts', 'Adapter', 'frontend/src/features/session/adapters/httpAuthenticationGateway.ts', 'Implements current, sign-in, and sign-out through BFF endpoints.', 'Provider protocol remains outside the domain.'),
@@ -349,6 +364,8 @@ export const architectureViews: Record<ArchitectureViewId, ArchitectureView> = {
       file('cache', 300, 500, 'sessionCache.ts', 'State', 'frontend/src/features/session/presentation/current-session/sessionCache.ts', 'Evicts authenticated data and writes anonymous session state after logout or 401.', 'Centralize session-expiry cache behavior.'),
     ],
     edges: [
+      edge('consumer-door', 'consumer', 'door', 'imports useCurrentUser'),
+      edge('door-hook', 'door', 'session-hook', 're-exports'),
       edge('adapter-port', 'adapter', 'port', 'implements', 'implements'), edge('adapter-domain', 'adapter', 'domain', 'maps User'),
       edge('service-port', 'service', 'port', 'depends on'), edge('service-domain', 'service', 'domain', 'returns User'),
       edge('hook-service', 'session-hook', 'service', 'invokes'), edge('screen-hook', 'screen', 'session-hook', 'reads / mutates'),
@@ -360,7 +377,8 @@ export const architectureViews: Record<ArchitectureViewId, ArchitectureView> = {
     id: 'frontend-projects', parent: 'frontend', label: 'Project files', eyebrow: 'Frontend / projects feature', title: 'A vertical slice from screen to transport.',
     description: 'The project capability is split by reason to change while retaining one feature boundary.',
     nodes: [
-      file('domain', 980, 180, 'project.ts', 'Domain', 'frontend/src/features/projects/domain/project.ts', 'Defines ProjectId and Project, including owner identity.', 'Transport-independent project vocabulary.'),
+      file('domain', 980, 180, 'project.ts', 'Domain', 'frontend/src/features/projects/domain/project.ts', 'Defines the Project model. It declares neither of the two IDs it uses: ProjectId and the owner\'s UserId both come from the kernel.', 'Transport-independent project vocabulary.', "from '@/shared/domain/identity'"),
+      file('kernel', 1320, 180, 'identity.ts', 'Domain', 'frontend/src/shared/domain/identity.ts', 'The shared kernel. ProjectId lives here rather than in this feature because tasks must name a project too, and a task naming a project should not make tasks depend on the projects feature.', 'Vocabulary two features must agree on, owned by neither.', 'export type ProjectId'),
       file('port', 650, 120, 'ports.ts', 'Application', 'frontend/src/features/projects/application/ports.ts', 'Defines list, get, and create operations plus CreateProjectInput.', 'Own the gateway contract inward of HTTP.'),
       file('adapter', 320, 30, 'httpProjectsGateway.ts', 'Adapter', 'frontend/src/features/projects/adapters/httpProjectsGateway.ts', 'Implements project operations with typed API requests and DTO mapping.', 'HTTP and antiforgery stay at the edge.'),
       file('page', 0, 180, 'ProjectsPage.tsx', 'Presentation', 'frontend/src/features/projects/presentation/ProjectsPage.tsx', 'Composes list and creation capabilities.', 'Feature-level UI composition.'),
@@ -376,21 +394,24 @@ export const architectureViews: Record<ArchitectureViewId, ArchitectureView> = {
       edge('hook-port', 'hook', 'port', 'list() via service token'), edge('hook-domain', 'hook', 'domain', 'maps Project'),
       edge('create-port', 'create', 'port', 'create() via useCreateProject'), edge('hook-queries', 'hook', 'queries', 'cache identity'),
       edge('create-queries', 'create', 'queries', 'invalidates'),
+      edge('domain-kernel', 'domain', 'kernel', 'ProjectId + UserId'), edge('port-kernel', 'port', 'kernel', 'ProjectId'),
     ],
   },
 
   'frontend-tasks': {
     id: 'frontend-tasks', parent: 'frontend', label: 'Task files', eyebrow: 'Frontend / tasks feature', title: 'Cross-feature vocabulary, inward dependencies.',
-    description: 'Tasks reach the server through a GraphQL gateway port and TanStack Query, with a scoped MobX view store for interaction state — the same seam as projects over a different transport.',
+    description: 'Tasks reach the server through a GraphQL gateway port and TanStack Query, with a scoped MobX view store for interaction state — the same seam as projects over a different transport. This is also where the feature axis shows: a task names a project and a user constantly, yet this feature imports neither of theirs.',
     nodes: [
-      file('domain', 1080, 300, 'task.ts', 'Domain', 'frontend/src/features/tasks/domain/task.ts', 'Defines TaskId, Task, TaskStatus, and TaskPriority.', 'Depend only on project/user domain vocabulary.'),
+      file('domain', 1080, 300, 'task.ts', 'Domain', 'frontend/src/features/tasks/domain/task.ts', 'Defines TaskId, Task, TaskStatus, and TaskPriority. TaskId is declared here and stays here — no other feature needs to name a task, so it remains this feature\'s own opinion.', 'Borrow ProjectId and UserId from the kernel; own TaskId.', "from '@/shared/domain/identity'"),
+      file('kernel', 1420, 300, 'identity.ts', 'Domain', 'frontend/src/shared/domain/identity.ts', 'The shared kernel. The asymmetry with TaskId is the rule made visible: a word goes here when two features must agree on it, and stays home when only one uses it.', 'Vocabulary only. Never a transport, a cache, or the container.', 'export type UserId'),
+      file('door', 380, -100, 'session/index.ts', 'Application', 'frontend/src/features/session/index.ts', 'Another feature\'s front door. TaskList genuinely needs the signed-in user to offer "assign to me", so this dependency is real — it is routed through a published surface instead of reaching into session\'s folders.', 'The one legal feature-to-feature edge in the codebase.', 'export { useCurrentUser'),
       file('port', 740, 300, 'ports.ts', 'Application', 'frontend/src/features/tasks/application/ports.ts', 'Defines the TasksGateway contract: list, create, complete, and assign.', 'Own the gateway contract inward of GraphQL.'),
       file('adapter', 740, 60, 'graphqlTasksGateway.ts', 'Adapter', 'frontend/src/features/tasks/adapters/graphqlTasksGateway.ts', 'Implements TasksGateway with typed GraphQL documents and maps enums, IDs, and dates.', 'Reject malformed wire values before they reach the domain model.'),
       file('store', 740, 540, 'tasksWorkspaceViewStore.ts', 'State', 'frontend/src/features/tasks/presentation/tasksWorkspaceViewStore.ts', 'Owns the project-scoped task visibility filter with MobX.', 'Hold interaction state only; never cache task entities.'),
       file('page', 0, 300, 'TasksPage.tsx', 'Presentation', 'frontend/src/features/tasks/presentation/TasksPage.tsx', 'Composes task creation and project-scoped task list.', 'Receive project selection from the route.'),
       file('list', 380, 140, 'TaskList.tsx', 'Presentation', 'frontend/src/features/tasks/presentation/task-list/TaskList.tsx', 'Renders tasks and exposes complete and assign-to-me gestures.', 'Use current user through session presentation, never its adapter.'),
       file('create', 380, 340, 'CreateTaskForm.tsx', 'Presentation', 'frontend/src/features/tasks/presentation/create-task/CreateTaskForm.tsx', 'Owns task draft and starts the create mutation.', 'Keep draft state local to the form.'),
-      file('mutations', 380, 540, 'useCompleteTask.ts', 'State', 'frontend/src/features/tasks/presentation/complete-task/useCompleteTask.ts', 'Completes a task through the gateway and invalidates the exact project task list.', 'Query owns mutation lifecycle and refresh.'),
+      file('mutations', 380, 540, 'useCompleteTask.ts', 'State', 'frontend/src/features/tasks/presentation/complete-task/useCompleteTask.ts', 'Completes a task through the gateway and invalidates the exact project task list. Per-row pending state is read back out of the mutation cache by key rather than stored in a "which id is in flight" variable, so completing two tasks at once keeps both spinners honest.', 'Query owns mutation lifecycle, refresh, and in-flight identity.', 'useMutationState({'),
       file('keys', 380, 720, 'taskKeys.ts', 'State', 'frontend/src/features/tasks/presentation/taskKeys.ts', 'Defines the per-project task list cache identity.', 'Isolate server state by resource identity.'),
     ],
     edges: [
@@ -401,6 +422,8 @@ export const architectureViews: Record<ArchitectureViewId, ArchitectureView> = {
       edge('list-keys', 'list', 'keys', 'cache key'), edge('mutations-keys', 'mutations', 'keys', 'invalidates'),
       edge('adapter-port', 'adapter', 'port', 'implements', 'implements'), edge('adapter-domain', 'adapter', 'domain', 'maps wire'),
       edge('port-domain', 'port', 'domain', 'returns Task'),
+      edge('domain-kernel', 'domain', 'kernel', 'ProjectId + UserId'), edge('port-kernel', 'port', 'kernel', 'ProjectId + UserId'),
+      edge('list-door', 'list', 'door', 'useCurrentUser'),
     ],
   },
 
@@ -456,7 +479,7 @@ export const architectureViews: Record<ArchitectureViewId, ArchitectureView> = {
       file('rest-tasks', 0, 480, 'TasksController.cs', 'Presentation', 'backend/src/TaskFlow.Api/Controllers/TasksController.cs', 'REST task endpoints over the same ITaskService.', 'Parallel delivery of the task use cases; the frontend now reaches tasks through GraphQL.'),
       file('oidc-events', 720, -100, 'OidcEvents.cs', 'Adapter', 'backend/src/TaskFlow.Api/Authentication/OidcEvents.cs', 'Provisions or links the external identity and adds the internal user ID claim.', 'Provider claims are translated at the trusted edge.'),
       file('current-user', 720, 150, 'HttpCurrentUser.cs', 'Adapter', 'backend/src/TaskFlow.Api/Authentication/HttpCurrentUser.cs', 'Implements ICurrentUser from the authenticated ClaimsPrincipal.', 'Application code sees an internal UserId, not HTTP claims.'),
-      file('errors', 720, 400, 'GlobalExceptionHandler.cs', 'Adapter', 'backend/src/TaskFlow.Api/ErrorHandling/GlobalExceptionHandler.cs', 'Maps domain, validation, conflict, not-found, and antiforgery exceptions to Problem Details.', 'Exception-to-HTTP translation stays at delivery boundary.'),
+      file('errors', 720, 400, 'GlobalExceptionHandler.cs', 'Adapter', 'backend/src/TaskFlow.Api/ErrorHandling/GlobalExceptionHandler.cs', 'Maps domain, validation, unauthenticated, conflict, not-found, and antiforgery exceptions to Problem Details. Its GraphQL twin, TaskFlowGraphQLErrorFilter, maps the same exception set to the same vocabulary, so a failure means the same thing on both transports.', 'Exception-to-HTTP translation stays at the delivery boundary — and stays identical across delivery boundaries.', 'UnauthenticatedException => CreateProblem('),
     ],
     edges: [
       edge('program-auth-controller', 'program', 'auth-controller', 'registers', 'registers'), edge('program-projects-controller', 'program', 'projects-controller', 'registers', 'registers'),
@@ -621,7 +644,52 @@ export const architectureViews: Record<ArchitectureViewId, ArchitectureView> = {
   },
 }
 
+/**
+ * The child views offered as tabs under a top-level view. This lives beside the views rather than
+ * in the component because it is the second half of the navigation graph: a view carries a `parent`
+ * so it can render a back button, and appears here so it can be reached in the first place. Listing
+ * a view in one and not the other produces a view with no way in, or a tab to nowhere — so the
+ * model test asserts the two agree.
+ */
+export const viewChildren: Partial<Record<ArchitectureViewId, { id: ArchitectureViewId; label: string }[]>> = {
+  frontend: [
+    { id: 'frontend-nutshell', label: 'In a nutshell' },
+    { id: 'frontend-composition', label: 'Composition / DI' },
+    { id: 'frontend-session', label: 'Session feature' },
+    { id: 'frontend-projects', label: 'Projects feature' },
+    { id: 'frontend-tasks', label: 'Tasks feature' },
+  ],
+  backend: [
+    { id: 'backend-api', label: 'API project' },
+    { id: 'backend-application', label: 'Application project' },
+    { id: 'backend-domain', label: 'Domain project' },
+    { id: 'backend-infrastructure', label: 'Infrastructure project' },
+  ],
+}
+
+/**
+ * The counterfactual toggle: a view paired with the version of itself that deletes the thing it
+ * teaches. The pairing is symmetric and each side carries its own button label, so the whole
+ * mechanism is one fact in one place instead of two hardcoded branches in the canvas.
+ */
+export const viewCounterfactual: Partial<Record<ArchitectureViewId, { id: ArchitectureViewId; label: string }>> = {
+  'di-inversion': { id: 'di-inversion-without', label: 'Delete the port' },
+  'di-inversion-without': { id: 'di-inversion', label: 'Restore the port' },
+}
+
+const sourceFileExtensions = ['.ts', '.tsx', '.cs', '.css', '.json', '.md', '.props', '.txt', '.slnx']
+
+/**
+ * Whether a source path names a file rather than a directory.
+ *
+ * Not "does the last segment contain a dot": `backend/src/TaskFlow.Api` is a directory, and .NET
+ * names every project that way, so the dot test sent all four backend project nodes to a blob URL
+ * for a folder. An extension allowlist is the boring answer and it is right.
+ */
+export function namesASourceFile(sourcePath: string) {
+  return sourceFileExtensions.some((extension) => sourcePath.endsWith(extension))
+}
+
 export function sourceUrl(sourcePath: string) {
-  const target = sourcePath.split('/').at(-1)?.includes('.') === true ? 'blob' : 'tree'
-  return `${repositoryBase}/${target}/main/${sourcePath}`
+  return `${repositoryBase}/${namesASourceFile(sourcePath) ? 'blob' : 'tree'}/main/${sourcePath}`
 }
