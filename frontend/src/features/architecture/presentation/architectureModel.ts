@@ -1,4 +1,17 @@
-import type { Edge, Node } from '@xyflow/react'
+import {
+  edge,
+  file,
+  node,
+  type ExplorerGraph,
+  type ExplorerNodeData,
+  type ExplorerView,
+} from './explorer/explorerGraph'
+
+/**
+ * TaskFlow's architecture graph — the only file you rewrite when copying `explorer/` into another
+ * repository. Everything here is content: which views exist, what is on them, and why each node
+ * earns its place. The explorer itself knows none of it.
+ */
 
 export type ArchitectureViewId =
   | 'overview'
@@ -17,101 +30,9 @@ export type ArchitectureViewId =
   | 'di-inversion'
   | 'di-inversion-without'
 
-/**
- * The arrow vocabulary. Dependency inversion is a claim about two arrow systems pointing in
- * opposite directions, so edges carry semantics, not just labels:
- * - imports:    compile-time knowledge — one file may name types from another.
- * - implements: the inverted arrow — an outer adapter fulfilling a contract owned further in.
- * - registers:  composition wiring — a factory recorded under a token, no instance exists yet.
- * - runtime:    an instance or request flowing while the app runs (animated).
- * - forbidden:  the dependency the architecture exists to prevent.
- */
-export type EdgeKind = 'imports' | 'implements' | 'registers' | 'runtime' | 'forbidden'
+type ArchitectureView = ExplorerView<ArchitectureViewId>
 
-export interface ArchitectureNodeData extends Record<string, unknown> {
-  label: string
-  kind: string
-  level: 'System' | 'Project' | 'Layer' | 'Module' | 'File'
-  description: string
-  technology: string
-  responsibility: string
-  sourcePath?: string
-  drilldown?: ArchitectureViewId
-  /**
-   * A distinctive code snippet locating the lines this node teaches. Resolved against the file's
-   * source at render time (not stored line numbers), so ordinary edits elsewhere in the file
-   * cannot silently point the highlight at the wrong code.
-   */
-  focus?: string
-}
-
-export interface ArchitectureView {
-  id: ArchitectureViewId
-  label: string
-  eyebrow: string
-  title: string
-  description: string
-  parent?: ArchitectureViewId
-  nodes: Node<ArchitectureNodeData>[]
-  edges: Edge[]
-}
-
-const repositoryBase = 'https://github.com/auauwolff/TaskFlow'
-
-function node(id: string, x: number, y: number, data: ArchitectureNodeData): Node<ArchitectureNodeData> {
-  return { id, position: { x, y }, data, type: 'architecture' }
-}
-
-interface EdgeRouting {
-  fromBelow?: boolean
-  intoBelow?: boolean
-}
-
-function edge(
-  id: string,
-  source: string,
-  target: string,
-  label: string,
-  kind: EdgeKind = 'imports',
-  routing: EdgeRouting = {},
-): Edge {
-  return {
-    id,
-    source,
-    target,
-    label,
-    animated: kind === 'runtime' || kind === 'forbidden',
-    type: 'smoothstep',
-    className: `architecture-edge--${kind}`,
-    sourceHandle: routing.fromBelow === true ? 'up' : undefined,
-    targetHandle: routing.intoBelow === true ? 'down' : undefined,
-  }
-}
-
-function file(
-  id: string,
-  x: number,
-  y: number,
-  label: string,
-  kind: string,
-  sourcePath: string,
-  description: string,
-  responsibility: string,
-  focus?: string,
-): Node<ArchitectureNodeData> {
-  return node(id, x, y, {
-    label,
-    kind,
-    level: 'File',
-    technology: sourcePath.split('/').at(-1) ?? sourcePath,
-    sourcePath,
-    description,
-    responsibility,
-    focus,
-  })
-}
-
-const browser: ArchitectureNodeData = {
+const browser: ExplorerNodeData = {
   label: 'Frontend application',
   kind: 'Frontend',
   level: 'Project',
@@ -122,7 +43,7 @@ const browser: ArchitectureNodeData = {
   drilldown: 'frontend',
 }
 
-const api: ArchitectureNodeData = {
+const api: ExplorerNodeData = {
   label: 'Backend solution',
   kind: 'Backend',
   level: 'Project',
@@ -133,9 +54,9 @@ const api: ArchitectureNodeData = {
   drilldown: 'backend',
 }
 
-export const primaryViewOrder: ArchitectureViewId[] = ['overview', 'frontend', 'backend', 'sign-in', 'di-inversion']
+const primaryViewOrder: ArchitectureViewId[] = ['overview', 'frontend', 'backend', 'sign-in', 'di-inversion']
 
-export const architectureViews: Record<ArchitectureViewId, ArchitectureView> = {
+const architectureViews: Record<ArchitectureViewId, ArchitectureView> = {
   overview: {
     id: 'overview', label: 'Full stack', eyebrow: 'Repository map / 01', title: 'The codebase at a glance.',
     description: 'Start with deployable parts and their dependencies. Open the frontend or backend to navigate all the way down to layers, modules, and files.',
@@ -651,7 +572,7 @@ export const architectureViews: Record<ArchitectureViewId, ArchitectureView> = {
  * a view in one and not the other produces a view with no way in, or a tab to nowhere — so the
  * model test asserts the two agree.
  */
-export const viewChildren: Partial<Record<ArchitectureViewId, { id: ArchitectureViewId; label: string }[]>> = {
+const viewChildren: Partial<Record<ArchitectureViewId, { id: ArchitectureViewId; label: string }[]>> = {
   frontend: [
     { id: 'frontend-nutshell', label: 'In a nutshell' },
     { id: 'frontend-composition', label: 'Composition / DI' },
@@ -672,24 +593,39 @@ export const viewChildren: Partial<Record<ArchitectureViewId, { id: Architecture
  * teaches. The pairing is symmetric and each side carries its own button label, so the whole
  * mechanism is one fact in one place instead of two hardcoded branches in the canvas.
  */
-export const viewCounterfactual: Partial<Record<ArchitectureViewId, { id: ArchitectureViewId; label: string }>> = {
+const viewCounterfactual: Partial<Record<ArchitectureViewId, { id: ArchitectureViewId; label: string }>> = {
   'di-inversion': { id: 'di-inversion-without', label: 'Delete the port' },
   'di-inversion-without': { id: 'di-inversion', label: 'Restore the port' },
 }
 
-const sourceFileExtensions = ['.ts', '.tsx', '.cs', '.css', '.json', '.md', '.props', '.txt', '.slnx']
-
 /**
- * Whether a source path names a file rather than a directory.
- *
- * Not "does the last segment contain a dot": `backend/src/TaskFlow.Api` is a directory, and .NET
- * names every project that way, so the dot test sent all four backend project nodes to a blob URL
- * for a folder. An extension allowlist is the boring answer and it is right.
+ * Where each view sits in the Clean Architecture lens when no node is selected, so the compass
+ * still orients you the moment a view opens. Views not listed here span rings rather than sitting
+ * in one, and the compass simply shows no active ring.
  */
-export function namesASourceFile(sourcePath: string) {
-  return sourceFileExtensions.some((extension) => sourcePath.endsWith(extension))
+const viewLensKinds: Partial<Record<ArchitectureViewId, string>> = {
+  'frontend-nutshell': 'Application',
+  'frontend-composition': 'Composition',
+  'frontend-session': 'Application',
+  'frontend-projects': 'Application',
+  'frontend-tasks': 'Application',
+  'backend-api': 'Presentation',
+  'backend-application': 'Application',
+  'backend-domain': 'Domain',
+  'backend-infrastructure': 'Adapter',
+  'di-inversion': 'Composition',
+  'di-inversion-without': 'Presentation',
 }
 
-export function sourceUrl(sourcePath: string) {
-  return `${repositoryBase}/${namesASourceFile(sourcePath) ? 'blob' : 'tree'}/main/${sourcePath}`
+export const taskflowGraph: ExplorerGraph<ArchitectureViewId> = {
+  root: 'overview',
+  primary: primaryViewOrder,
+  children: viewChildren,
+  counterfactual: viewCounterfactual,
+  views: Object.fromEntries(
+    Object.entries<ArchitectureView>(architectureViews).map(([id, view]) => [
+      id,
+      { ...view, lensKind: viewLensKinds[id as ArchitectureViewId] },
+    ]),
+  ) as Record<ArchitectureViewId, ArchitectureView>,
 }

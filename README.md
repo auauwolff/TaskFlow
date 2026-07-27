@@ -37,6 +37,10 @@ anonymous slice and the machinery that serves it. Every feature is a copy of tha
 The model is curated rather than generated, so it shows the edges that explain the architecture
 instead of every incidental import. Tests hold it to the codebase.
 
+The viewer itself is repository-agnostic: it takes a graph, a source provider, and an optional
+architecture lens. Copying `frontend/src/features/architecture/presentation/explorer/` into another
+codebase and writing one graph file is the whole integration — see that folder's README.
+
 ## Architecture
 
 ```mermaid

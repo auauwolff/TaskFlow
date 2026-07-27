@@ -12,102 +12,44 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import '@xyflow/react/dist/style.css'
 import './ArchitectureExplorer.css'
-import {
-  architectureViews,
-  primaryViewOrder,
-  sourceUrl,
-  viewChildren,
-  viewCounterfactual,
-  type ArchitectureNodeData,
-  type ArchitectureView,
-  type ArchitectureViewId,
-} from './architectureModel'
-import { getSourceCode } from './sourceCode'
+import type { ExplorerGraph, ExplorerNodeData, ExplorerView } from './explorerGraph'
+import type { ExplorerLens } from './explorerLens'
+import type { SourceProvider } from './sourceProvider'
 
-function ArchitectureNode({ data, selected }: NodeProps) {
-  const architectureData = data as ArchitectureNodeData
+/**
+ * A hierarchical codebase explorer: navigate from systems to projects, layers, modules, and files,
+ * isolate a node's dependency neighbourhood, and read the source without leaving the graph.
+ *
+ * Everything specific to a repository arrives as props. The graph is the content, the
+ * {@link SourceProvider} decides how files are reached, and the {@link ExplorerLens} supplies the
+ * architecture vocabulary. Copy this folder into another repository and the only file you write is
+ * the graph.
+ */
+
+function ExplorerNode({ data, selected }: NodeProps) {
+  const nodeData = data as ExplorerNodeData
 
   return (
-    <div className={`architecture-node architecture-node--${architectureData.kind.toLowerCase()}${selected ? ' is-selected' : ''}`}>
+    <div className={`architecture-node architecture-node--${nodeData.kind.toLowerCase()}${selected ? ' is-selected' : ''}`}>
       <Handle type="target" position={Position.Left} />
       {/* Vertical handles let a view route its runtime arrows on a different axis than its
-          compile-time arrows — the DI inversion lens depends on the two systems reading as
+          compile-time arrows — a dependency-inversion lens depends on the two systems reading as
           visually opposed rather than tangled. */}
       <Handle type="target" position={Position.Bottom} id="down" />
       <div className="architecture-node__meta">
-        <span>{architectureData.level} / {architectureData.kind}</span>
-        <span className="architecture-node__mark">{architectureData.kind.slice(0, 2).toUpperCase()}</span>
+        <span>{nodeData.level} / {nodeData.kind}</span>
+        <span className="architecture-node__mark">{nodeData.kind.slice(0, 2).toUpperCase()}</span>
       </div>
-      <strong>{architectureData.label}</strong>
-      <small>{architectureData.technology}</small>
-      {architectureData.drilldown === undefined ? null : <span className="architecture-node__drill">Explore contents</span>}
+      <strong>{nodeData.label}</strong>
+      <small>{nodeData.technology}</small>
+      {nodeData.drilldown === undefined ? null : <span className="architecture-node__drill">Explore contents</span>}
       <Handle type="source" position={Position.Right} />
       <Handle type="source" position={Position.Top} id="up" />
     </div>
   )
 }
 
-const nodeTypes = { architecture: ArchitectureNode }
-
-const viewKinds: Partial<Record<ArchitectureViewId, string>> = {
-  'frontend-nutshell': 'Application',
-  'frontend-composition': 'Composition',
-  'frontend-session': 'Application',
-  'frontend-projects': 'Application',
-  'frontend-tasks': 'Application',
-  'backend-api': 'Presentation',
-  'backend-application': 'Application',
-  'backend-domain': 'Domain',
-  'backend-infrastructure': 'Adapter',
-  'di-inversion': 'Composition',
-  'di-inversion-without': 'Presentation',
-}
-
-function viewPath(viewId: ArchitectureViewId) {
-  const path: string[] = []
-  let current: ArchitectureView | undefined = architectureViews[viewId]
-
-  while (current !== undefined) {
-    path.unshift(current.label)
-    current = current.parent === undefined ? undefined : architectureViews[current.parent]
-  }
-
-  return path
-}
-
-function ArchitectureCompass({ viewId, selectedNode }: {
-  viewId: ArchitectureViewId
-  selectedNode: Node<ArchitectureNodeData> | null
-}) {
-  const activeKind = selectedNode?.data.kind ?? viewKinds[viewId]
-  const path = [...viewPath(viewId), ...(selectedNode === null ? [] : [selectedNode.data.label])]
-  const isOuterEdge = activeKind === 'Presentation' || activeKind === 'Composition' || activeKind === 'Adapter' || activeKind === 'Token'
-
-  return (
-    <aside className="architecture-compass" aria-label="Current architecture position">
-      <div className="architecture-compass__heading">
-        <span>Architecture position</span>
-        <strong>{path.join(' / ')}</strong>
-      </div>
-      <div className="architecture-compass__map">
-        <span className={`architecture-compass__system architecture-compass__system--data${activeKind === 'Data' || activeKind === 'State' ? ' is-active' : ''}`}>Data</span>
-        <span className={`architecture-compass__system architecture-compass__system--external${activeKind === 'External' ? ' is-active' : ''}`}>External</span>
-        <div className={`architecture-compass__ring architecture-compass__ring--outer${isOuterEdge ? ' is-active' : ''}`}>
-          <span className={activeKind === 'Presentation' ? 'is-active' : ''}>Presentation</span>
-          <span className={activeKind === 'Composition' ? 'is-active' : ''}>Composition</span>
-          <span className={activeKind === 'Adapter' ? 'is-active' : ''}>Adapters</span>
-          <div className={`architecture-compass__ring architecture-compass__ring--application${activeKind === 'Application' ? ' is-active' : ''}`}>
-            <span>Application / ports</span>
-            <div className={`architecture-compass__ring architecture-compass__ring--domain${activeKind === 'Domain' ? ' is-active' : ''}`}>
-              <strong>Domain</strong>
-            </div>
-          </div>
-        </div>
-        <div className="architecture-compass__direction">Dependencies point inward</div>
-      </div>
-    </aside>
-  )
-}
+const nodeTypes = { explorer: ExplorerNode }
 
 // The focus anchor is a code snippet, not stored line numbers: the range is resolved against the
 // current source on every render, so edits elsewhere in a file can never silently shift the
@@ -121,18 +63,28 @@ function focusLines(source: string, focus: string | undefined): [number, number]
   return [firstLine, firstLine + focus.split('\n').length - 1]
 }
 
-function SourceViewer({ source, sourcePath, focus }: { source: string; sourcePath: string; focus?: string }) {
+function SourceViewer({ sourcePath, focus, source }: {
+  sourcePath: string
+  focus?: string
+  source: SourceProvider
+}) {
   const [highlightedSource, setHighlightedSource] = useState<string>()
   const frameRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let active = true
+    setHighlightedSource(undefined)
 
-    void import('./sourceHighlighter')
-      .then(({ highlightSource }) => highlightSource(source, sourcePath, focusLines(source, focus)))
-      .then((html) => {
-        if (active) setHighlightedSource(html)
-      })
+    // Reading and highlighting are both deferred: the provider may fetch, and the highlighter is a
+    // large dependency that has no business in the initial chunk.
+    void (async () => {
+      const text = await source.read(sourcePath)
+      if (!active || text === undefined) return
+
+      const { highlightSource } = await import('./sourceHighlighter')
+      const html = await highlightSource(text, sourcePath, focusLines(text, focus))
+      if (active) setHighlightedSource(html)
+    })()
 
     return () => { active = false }
   }, [source, sourcePath, focus])
@@ -148,37 +100,37 @@ function SourceViewer({ source, sourcePath, focus }: { source: string; sourcePat
   return (
     <section className="architecture-source" aria-label="Source code">
       {highlightedSource === undefined
-        ? <div className="architecture-source__loading">Loading syntax highlighting...</div>
+        ? <div className="architecture-source__loading">Loading source...</div>
         : <div className="architecture-source__frame" ref={frameRef} dangerouslySetInnerHTML={{ __html: highlightedSource }} />}
     </section>
   )
 }
 
-function topLevelViewId(viewId: ArchitectureViewId) {
-  let current = architectureViews[viewId]
-
-  while (current.parent !== undefined && current.parent !== 'overview') {
-    current = architectureViews[current.parent]
-  }
-
-  return current.id
+export interface ArchitectureExplorerProps<Id extends string = string> {
+  graph: ExplorerGraph<Id>
+  source: SourceProvider
+  lens?: ExplorerLens
+  heading: { kicker: string; title: string; intro: string }
 }
 
-export function ArchitectureExplorer() {
+export function ArchitectureExplorer<Id extends string = string>({
+  graph,
+  source,
+  lens,
+  heading,
+}: ArchitectureExplorerProps<Id>) {
   const isCompact = window.matchMedia('(max-width: 800px)').matches
-  const [viewId, setViewId] = useState<ArchitectureViewId>('overview')
+  const [viewId, setViewId] = useState<Id>(graph.root)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const view = architectureViews[viewId]
+  const view = graph.views[viewId]
   const [layoutNodes, setLayoutNodes, onNodesChange] = useNodesState(view.nodes)
-  const [flowInstance, setFlowInstance] = useState<ReactFlowInstance<Node<ArchitectureNodeData>>>()
-  const activeTopLevelViewId = topLevelViewId(viewId)
-  const counterfactual = viewCounterfactual[viewId]
+  const [flowInstance, setFlowInstance] = useState<ReactFlowInstance<Node<ExplorerNodeData>>>()
+  const counterfactual = graph.counterfactual?.[viewId]
   // You are standing in the counterfactual when the view it toggles to is also the view you came
   // from - which is only true of the "without" side of the pair.
   const isCounterfactual = counterfactual !== undefined && view.parent === counterfactual.id
   const selectedNode = view.nodes.find((node) => node.id === selectedId) ?? null
   const selectedSourcePath = selectedNode?.data.sourcePath
-  const selectedSource = getSourceCode(selectedSourcePath)
   const connectedIds = selectedId === null
     ? null
     : new Set([
@@ -202,10 +154,32 @@ export function ArchitectureExplorer() {
     ].join(' ').trim(),
   }))
 
-  function openView(nextView: ArchitectureViewId) {
+  function topLevelViewId(id: Id) {
+    let current = graph.views[id]
+
+    while (current.parent !== undefined && current.parent !== graph.root) {
+      current = graph.views[current.parent]
+    }
+
+    return current.id
+  }
+
+  function viewPath(id: Id) {
+    const path: string[] = []
+    let current: ExplorerView<Id> | undefined = graph.views[id]
+
+    while (current !== undefined) {
+      path.unshift(current.label)
+      current = current.parent === undefined ? undefined : graph.views[current.parent]
+    }
+
+    return path
+  }
+
+  function openView(nextView: Id) {
     setViewId(nextView)
     setSelectedId(null)
-    setLayoutNodes(architectureViews[nextView].nodes)
+    setLayoutNodes(graph.views[nextView].nodes)
   }
 
   function resetLayout() {
@@ -221,25 +195,28 @@ export function ArchitectureExplorer() {
     })
   }
 
+  const activeTopLevelViewId = topLevelViewId(viewId)
+  const externalUrl = selectedSourcePath === undefined ? undefined : source.urlFor(selectedSourcePath)
+
   return (
     <main className="architecture-explorer">
       <aside className="architecture-sidebar">
         <div>
-          <p className="architecture-kicker">TaskFlow / Architecture</p>
-          <h1>System explorer</h1>
-          <p className="architecture-intro">Navigate from deployable systems to layers, modules, dependency injection, and concrete files.</p>
+          <p className="architecture-kicker">{heading.kicker}</p>
+          <h1>{heading.title}</h1>
+          <p className="architecture-intro">{heading.intro}</p>
         </div>
 
         <nav className="architecture-nav" aria-label="Architecture views">
-          {primaryViewOrder.map((id, index) => {
-            const children = viewChildren[id]
+          {graph.primary.map((id, index) => {
+            const children = graph.children?.[id]
             const isActiveBranch = id === activeTopLevelViewId
 
             return (
               <div className="architecture-nav__branch" key={id}>
                 <button className={isActiveBranch ? 'is-active' : ''} type="button" onClick={() => openView(id)}>
                   <span>0{index + 1}</span>
-                  {architectureViews[id].label}
+                  {graph.views[id].label}
                 </button>
                 {!isActiveBranch || children === undefined ? null : (
                   <div className="architecture-nav__children">
@@ -260,22 +237,23 @@ export function ArchitectureExplorer() {
           })}
         </nav>
 
-        <div className="architecture-legend">
-          <p>Layer key</p>
-          <div><i className="legend-domain" />Domain</div>
-          <div><i className="legend-application" />Application</div>
-          <div><i className="legend-adapter" />Adapter / edge</div>
-          <div><i className="legend-state" />State / data</div>
-          <div><i className="legend-token" />DI token</div>
-        </div>
+        {lens?.nodeLegend === undefined ? null : (
+          <div className="architecture-legend">
+            <p>{lens.nodeLegend.title}</p>
+            {lens.nodeLegend.entries.map((entry) => (
+              <div key={entry.label}><i className={entry.className} />{entry.label}</div>
+            ))}
+          </div>
+        )}
 
-        <div className="architecture-legend architecture-legend--edges">
-          <p>Arrow key</p>
-          <div><i className="legend-edge legend-edge--imports" />Imports / uses</div>
-          <div><i className="legend-edge legend-edge--implements" />Implements (inverted)</div>
-          <div><i className="legend-edge legend-edge--registers" />DI registration</div>
-          <div><i className="legend-edge legend-edge--runtime" />Runtime flow</div>
-        </div>
+        {lens?.edgeLegend === undefined ? null : (
+          <div className="architecture-legend architecture-legend--edges">
+            <p>{lens.edgeLegend.title}</p>
+            {lens.edgeLegend.entries.map((entry) => (
+              <div key={entry.label}><i className={entry.className} />{entry.label}</div>
+            ))}
+          </div>
+        )}
       </aside>
 
       <section className="architecture-stage">
@@ -284,7 +262,7 @@ export function ArchitectureExplorer() {
             ? <span className="architecture-breadcrumb">{view.label}</span>
             : (
               <button className="architecture-back" type="button" onClick={() => openView(view.parent!)}>
-                &lt;- {architectureViews[view.parent].label}
+                &lt;- {graph.views[view.parent].label}
               </button>
             )}
           <div className="architecture-viewheader">
@@ -311,7 +289,7 @@ export function ArchitectureExplorer() {
             onPaneClick={() => setSelectedId(null)}
             onNodeClick={(_, node) => setSelectedId(node.id)}
             onNodeDoubleClick={(_, node) => {
-              const drilldown = node.data.drilldown as ArchitectureViewId | undefined
+              const drilldown = node.data.drilldown as Id | undefined
               if (drilldown !== undefined) openView(drilldown)
             }}
             proOptions={{ hideAttribution: true }}
@@ -334,27 +312,30 @@ export function ArchitectureExplorer() {
             )}
           </div>
 
-          <ArchitectureCompass viewId={viewId} selectedNode={selectedNode} />
+          {lens?.compass?.({
+            activeKind: selectedNode?.data.kind ?? view.lensKind,
+            path: [...viewPath(viewId), ...(selectedNode === null ? [] : [selectedNode.data.label])],
+          })}
 
           {selectedNode === null ? null : (
-            <aside className={`architecture-inspector${selectedSource === undefined ? '' : ' architecture-inspector--source'}`}>
+            <aside className={`architecture-inspector${selectedSourcePath === undefined ? '' : ' architecture-inspector--source'}`}>
               <button className="architecture-inspector__close" type="button" aria-label="Close details" onClick={() => setSelectedId(null)}>x</button>
               <p>{selectedNode.data.kind}</p>
               <h3>{selectedNode.data.label}</h3>
               <span className="architecture-inspector__tech">{selectedNode.data.level} / {selectedNode.data.technology}</span>
-              {selectedNode.data.sourcePath === undefined
+              {selectedSourcePath === undefined
                 ? null
-                : <code className="architecture-inspector__path">{selectedNode.data.sourcePath}</code>}
-              {selectedSource === undefined || selectedSourcePath === undefined
+                : <code className="architecture-inspector__path">{selectedSourcePath}</code>}
+              {selectedSourcePath === undefined
                 ? null
-                : <SourceViewer key={selectedSourcePath} source={selectedSource} sourcePath={selectedSourcePath} focus={selectedNode.data.focus} />}
+                : <SourceViewer key={selectedSourcePath} sourcePath={selectedSourcePath} focus={selectedNode.data.focus} source={source} />}
               {selectedNode.data.drilldown === undefined ? null : (
-                <button className="architecture-inspector__primary" type="button" onClick={() => openView(selectedNode.data.drilldown!)}>
+                <button className="architecture-inspector__primary" type="button" onClick={() => openView(selectedNode.data.drilldown as Id)}>
                   Explore {selectedNode.data.label}
                 </button>
               )}
-              {selectedNode.data.sourcePath === undefined ? null : (
-                <a href={sourceUrl(selectedNode.data.sourcePath)} target="_blank" rel="noreferrer">Open on GitHub <span>-&gt;</span></a>
+              {externalUrl === undefined ? null : (
+                <a href={externalUrl} target="_blank" rel="noreferrer">Open on GitHub <span>-&gt;</span></a>
               )}
             </aside>
           )}
