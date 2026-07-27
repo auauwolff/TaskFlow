@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Build properties and the shared test stack come from ../Directory.Build.props. -->
+
+  <ItemGroup>
+    <PackageReference Include="Testcontainers.PostgreSql" Version="4.7.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TaskFlow.Infrastructure\TaskFlow.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

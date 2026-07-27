@@ -6,10 +6,10 @@ using TaskFlow.Domain.Entities;
 namespace TaskFlow.Infrastructure.Persistence;
 
 /// <summary>
-/// The EF Core context — our concrete <see cref="IUnitOfWork"/> over PostgreSQL. A DbContext already
+/// The EF Core context — the concrete <see cref="IUnitOfWork"/> over PostgreSQL. A DbContext already
 /// tracks changes in memory and commits them atomically in <c>SaveChangesAsync</c>, which is exactly
-/// the contract <see cref="IUnitOfWork"/> promised — so we satisfy that interface with zero extra code
-/// (we just declare we implement it). This is the moment the third Phase-2 "port" gets its plug.
+/// the contract <see cref="IUnitOfWork"/> promised, so the interface is satisfied by declaring it and
+/// writing no extra code. The port is owned by Application; this is where it gets its adapter.
 /// </summary>
 public sealed class TaskFlowDbContext : DbContext, IUnitOfWork
 {

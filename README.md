@@ -1,5 +1,8 @@
 # TaskFlow
 
+[![CI](https://github.com/auauwolff/TaskFlow/actions/workflows/ci.yml/badge.svg)](https://github.com/auauwolff/TaskFlow/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A reference architecture for full-stack applications: Clean Architecture in .NET on the backend,
 feature-first Hexagonal Architecture in React on the frontend, in a codebase small enough to read
 end to end and structured to hold up at enterprise size.
@@ -216,10 +219,21 @@ verified to fail before being trusted.
 | Cross-feature imports go through the front door | `cross-feature-imports-use-the-front-door` |
 | The shared kernel holds vocabulary, not logic | `shared-kernel-holds-vocabulary-not-logic` |
 | The architecture explorer still describes this codebase | `architectureModel.test.ts` |
+| Migrations still match the EF model | `TaskFlow.Infrastructure.Tests` |
+| All of the above, on every push | `.github/workflows/ci.yml` |
 
 The dependency-cruiser configuration sets `tsPreCompilationDeps`, so `import type` counts. A type-only
 import is erased at runtime but is still an architectural dependency: a domain layer importing a type
 from another feature is coupled to it whether or not the bundler can tell.
+
+Two of these are worth expanding on.
+
+`TaskFlow.Infrastructure.Tests` runs against a disposable PostgreSQL container started by
+Testcontainers, because the behaviour it checks belongs to PostgreSQL rather than to C#. An in-memory
+or SQLite double would answer the question convincingly and wrongly: neither has an `xmin` system
+column, so the concurrency token would silently do nothing and the tests would still pass. The schema
+comes from running the real migrations, so a migration that has drifted from the model fails there
+too. Docker must be running locally; it is preinstalled on GitHub's Ubuntu runners.
 
 The explorer test is the answer to a specific failure mode — a hand-curated diagram of a moving
 codebase rots silently, because a renamed file leaves a dead link and a moved declaration leaves a
@@ -244,8 +258,17 @@ TaskFlow/
 |-- frontend/            React/Vite application, architecture rules, and browser tests
 |-- infra/keycloak/      Local OIDC realm configuration
 |-- docker-compose.yml   PostgreSQL and Keycloak development services
+|-- .github/workflows/   CI running every check below
 `-- README.md
 ```
+
+| Test project | Scope | Needs |
+| --- | --- | --- |
+| `TaskFlow.Domain.Tests` | Entity invariants and state transitions | Nothing |
+| `TaskFlow.Application.Tests` | Use-case orchestration over substituted ports | Nothing |
+| `TaskFlow.Infrastructure.Tests` | Value converters, concurrency tokens, migrations | Docker |
+| `frontend/src/**/*.test.ts` | Domain, adapters, view models, architecture model | Nothing |
+| `frontend/e2e` | Real browser, API, PostgreSQL, and Keycloak login | Docker |
 
 ## Run locally
 
@@ -304,7 +327,8 @@ pnpm --dir frontend build
 ```
 
 The build is the quality bar: `Directory.Build.props` sets warnings-as-errors, analyzers, and
-enforced code style solution-wide, so there is no flag to remember.
+enforced code style solution-wide, so there is no flag to remember. `dotnet test` includes the
+Testcontainers-backed persistence tests, so Docker needs to be running.
 
 The browser suite runs against disposable PostgreSQL and Keycloak containers on separate ports. It
 does not touch the normal development volumes and can run beside the development stack:
@@ -337,9 +361,10 @@ production containers and a reverse proxy, richer task transitions, collaboratio
 beyond single-owner access, and horizontal concerns such as caching, messaging, or background jobs.
 The patterns here are meant to survive their addition, not to pre-empt it.
 
-Acknowledged gaps: there is no CI workflow yet, so the checks above run on demand rather than on
-every push. Persistence behaviour — the `Email` value-converter round trip and the `xmin` concurrency
-token — is described here but not yet covered by integration tests against a real database.
+Integration coverage stops at the persistence boundary. The value-converter and concurrency
+behaviours are tested against real PostgreSQL because nothing else can prove them; the HTTP surface —
+antiforgery, the 401 policy, cross-user isolation — is covered end to end by the Playwright suite
+against a real API and a real Keycloak instead of by a second layer of API-level integration tests.
 
 ### Known deviations
 

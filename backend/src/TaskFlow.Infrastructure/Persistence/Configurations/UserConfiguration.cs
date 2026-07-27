@@ -6,10 +6,10 @@ using TaskFlow.Domain.ValueObjects;
 namespace TaskFlow.Infrastructure.Persistence.Configurations;
 
 /// <summary>
-/// How a <see cref="User"/> maps to the <c>users</c> table. THIS is the translation layer between
-/// the pure domain object and the database schema — and it lives here in Infrastructure precisely
-/// so the Domain never learns a database exists. (Remember the entity-vs-schema conversation:
-/// the entity came first and owes the DB nothing; this file is where the DB catches up to it.)
+/// How a <see cref="User"/> maps to the <c>users</c> table. This is the translation layer between
+/// the pure domain object and the database schema, and it lives in Infrastructure precisely so the
+/// Domain never learns a database exists: the entity is designed first and owes the schema nothing,
+/// and this file is where the schema catches up to it.
 /// </summary>
 internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
 {

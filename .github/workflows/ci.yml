@@ -1,0 +1,78 @@
+# Runs the same checks the README documents, so the architecture rules are enforced on every push
+# rather than whenever someone remembers. Each job mirrors a block of the "Checks" section verbatim.
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+# A new push to the same branch makes the previous run irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # global.json pins the SDK, so the version lives in one place rather than here as well.
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: backend/global.json
+
+      - name: Restore
+        run: dotnet restore backend/TaskFlow.slnx
+
+      # No --warnaserror: Directory.Build.props already makes warnings errors, analyzers current,
+      # and code style enforced. If this passes locally it passes here for the same reasons.
+      - name: Build
+        run: dotnet build backend/TaskFlow.slnx --no-restore
+
+      # Domain and Application tests need nothing external. The Infrastructure tests start their own
+      # PostgreSQL through Testcontainers, which works on ubuntu-latest because Docker is preinstalled.
+      - name: Test
+        run: dotnet test backend/TaskFlow.slnx --no-build --verbosity normal
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      # packageManager in package.json pins the pnpm version; corepack honours it.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      # The layer rules, the two feature-axis rules, and the circular-import check.
+      - name: Architecture rules
+        run: pnpm architecture
+
+      # Includes architectureModel.test.ts, which fails if the explorer has drifted from the code.
+      - name: Test
+        run: pnpm test
+
+      # Runs tsc -b before vite build, so this is the type check as well.
+      - name: Build
+        run: pnpm build
