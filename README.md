@@ -1,48 +1,58 @@
 # TaskFlow
 
-TaskFlow is a small project and task manager built to explore full-stack Clean Architecture in a
-codebase that is large enough to be realistic and small enough to understand end to end.
+A reference architecture for full-stack applications: Clean Architecture in .NET on the backend,
+feature-first Hexagonal Architecture in React on the frontend, in a codebase small enough to read
+end to end and structured to hold up at enterprise size.
 
-The domain is intentionally simple: `User -> Project -> TaskItem`. The focus is on explicit
-boundaries, dependency inversion, testable use cases, provider-neutral authentication, and clear
-state ownership rather than feature volume.
+The domain is deliberately small — `User -> Project -> TaskItem`. The subject of this repository is
+the boundaries, not the feature set. It is built to be read, discussed, and copied from when
+starting something new.
 
-## Why this repo exists
+## What it demonstrates
 
-This is a reference, not a product. It exists to be a place I can point at in an architecture
-discussion, and the place I look first when starting a real project that has to scale.
+- **A dependency rule the compiler enforces.** Backend layering is expressed as project references,
+  so an inward violation is a build error rather than a review comment.
+- **Ports and adapters on both sides of the wire.** The same seam appears in C# and in TypeScript,
+  so the pattern is visible independent of language or framework.
+- **Two transports behind one architecture.** Projects use REST, tasks use GraphQL, both reach the
+  same application services. Swapping a transport touches one adapter.
+- **Provider-neutral authentication.** ASP.NET owns the OIDC flow and an `HttpOnly` cookie; the
+  browser never sees a token and no identity-provider SDK reaches frontend code.
+- **Rules that fail the build.** Layer direction, cross-feature imports, ambient clock usage, and
+  the accuracy of the architecture diagrams are all checked by tooling, not convention.
+- **An interactive explorer** that navigates the real dependency graph from full-stack map down to
+  source files.
 
-The backend is the part I consider settled. The frontend architecture is the part I am still
-working out, taking cues from hexagonal ports-and-adapters and from the patterns in a large Nx
-monorepo I work in day to day. The size of the domain is deliberate and beside the point: the
-question this repo answers is "what shape should the boundaries be", not "what can the app do".
+## Interactive architecture explorer
 
-Every notable decision is recorded with its reasoning, including the ones where the answer was to
-*not* add something. The rejections are as much the content as the code.
-
-## Status
-
-The backend, OIDC authentication, project/task workflows, deep-linkable project workspaces, and
-isolated browser journeys are implemented. Production containers and richer task transitions remain
-on the roadmap. See [`PROGRESS.md`](PROGRESS.md) for the learning journal and implementation history.
-
-## Architecture
-
-### Interactive Explorer
-
-The frontend includes an Nx-style system explorer. Start the application frontend:
+The frontend ships an Nx-style system explorer for this codebase. Start the frontend:
 
 ```bash
 pnpm --dir frontend dev
 ```
 
-Then open <http://localhost:5173/architecture>. Start from the complete full-stack map, select any
-node to isolate its dependencies and consumers, then drill from frontend/backend projects into layers,
-modules, dependency-injection wiring, and concrete source files.
-A sign-in lens animates the end-to-end authentication path, and a dependency-inversion lens follows one
-port through both arrow systems with a toggle that deletes the port to show what it was buying. Source
-links in the inspector connect conceptual nodes back to their implementation. See
-[`frontend/ARCHITECTURE-EXPLORER.md`](frontend/ARCHITECTURE-EXPLORER.md) for the interaction guide.
+Then open <http://localhost:5173/architecture>.
+
+Start from the full-stack map, select any node to isolate its dependencies and consumers, then drill
+from projects into layers, modules, dependency-injection wiring, and concrete source files with
+syntax-highlighted source in the inspector. Two runtime lenses step outside the structural graph: a
+**sign-in flow** tracing the authentication path end to end, and a **DI inversion** lens that follows
+one port through both arrow systems — with a toggle that deletes the port to show what it was buying.
+
+Suggested tour:
+
+1. **Full stack** — frontend, backend, PostgreSQL, and OIDC dependencies.
+2. **Frontend application → In a nutshell** — the frontend with the features removed: one anonymous
+   slice and the machinery that serves it. Every feature is a copy of that shape.
+3. **Backend solution → TaskFlow.Domain** — entities, value objects, and the repository ports that
+   make Infrastructure point inward.
+4. **DI inversion**, then press *Delete the port*.
+
+The graph model is curated rather than generated: it shows the files and edges that explain the
+architecture instead of dumping every incidental import onto one canvas. It is held to the codebase
+by tests — see [Rules that fail the build](#rules-that-fail-the-build).
+
+## Architecture
 
 ```mermaid
 flowchart LR
@@ -58,22 +68,34 @@ flowchart LR
 
 ### Backend
 
-The backend follows the Clean Architecture dependency rule: dependencies point inward and inner
-layers know nothing about delivery or persistence details.
+Dependencies point inward. Inner layers know nothing about delivery or persistence.
 
 | Project                   | Depends on                  | Responsibility                                            |
 | ------------------------- | --------------------------- | --------------------------------------------------------- |
 | `TaskFlow.Domain`         | Nothing                     | Entities, value objects, invariants, repository contracts |
 | `TaskFlow.Application`    | Domain                      | Use cases, ports, DTOs, validation                        |
 | `TaskFlow.Infrastructure` | Application, Domain         | EF Core, PostgreSQL, repository adapters, migrations      |
-| `TaskFlow.Api`            | Application, Infrastructure | Controllers, authentication, middleware, composition root |
+| `TaskFlow.Api`            | Application, Infrastructure | Controllers, GraphQL, authentication, composition root    |
 
 Project references enforce these boundaries at compile time. ASP.NET is the composition root and
 wires the complete object graph through dependency injection.
 
+Business rules live in the entities: `TaskItem` owns its own state transitions and rejects invalid
+ones, rather than exposing setters for a service to orchestrate. Time is injected through
+`TimeProvider` so behaviour is testable, and reaching for an ambient clock instead is a compile
+error. Optimistic concurrency uses PostgreSQL's `xmin` as a shadow row version, and EF's concurrency
+exception is translated into an application-owned `ConflictException` inside Infrastructure so
+persistence details never reach a use case.
+
+Both delivery mechanisms are thin. REST controllers and Hot Chocolate GraphQL resolvers call the
+same `ITaskService`, and their exception-to-error translators are kept deliberately parallel — a
+test asserts the two produce the same vocabulary for the same failure, so a conflict means the same
+thing whichever transport reported it.
+
 ### Frontend
 
-The frontend uses feature-first Hexagonal Architecture. A feature creates only the layers it needs:
+Feature-first Hexagonal Architecture. A feature creates only the layers it needs; empty ceremonial
+layers are avoided.
 
 ```mermaid
 flowchart LR
@@ -84,24 +106,127 @@ flowchart LR
     Application --> Domain[domain<br/>models and policies]
 ```
 
-- TanStack Query owns project, session, and task server state; REST and GraphQL are transports feeding it.
-- A project-scoped MobX view store owns task-filter interaction state without copying server data.
-- TanStack Router owns shareable navigation state.
-- React Hook Form owns form values and validation.
-- Local React state owns component-local transient interaction state.
-- The typed IoC provider exposes stable injected services and project-scoped stores, not server data.
-- REST and GraphQL boundaries map transport values into application/domain models.
-- Dependency Cruiser enforces layer direction and rejects circular imports.
+- `domain` holds models and pure policies. It imports no outer layer.
+- `application` defines use-case contracts and ports. It may import `domain`.
+- `adapters` implement ports using HTTP, GraphQL, or browser APIs.
+- `presentation` adapts application capabilities to React through focused view-model hooks.
+- `app` is the composition root, combining feature registrations into one object graph.
 
-See [`frontend/ARCHITECTURE.md`](frontend/ARCHITECTURE.md) for the complete dependency and state
-ownership rules.
+#### The feature axis
 
-### Authentication
+The rule above governs how code is arranged *inside* one feature. It says nothing about how features
+relate to each other, and that is the boundary that actually decays as a codebase grows. Two further
+rules govern it:
 
-The browser talks only to stable TaskFlow endpoints. ASP.NET owns the OpenID Connect flow, tokens,
-antiforgery validation, and the secure `HttpOnly` session cookie. React has no identity-provider SDK
-and never receives access tokens. Keycloak is therefore a replaceable local adapter rather than an
-application dependency.
+**A feature imports another feature only through its `index.ts`.** A deep import couples the consumer
+to the other feature's internal folder layout, so moving a file becomes a cross-feature change.
+`features/session/index.ts` is the only session module another feature may name. `src/app` and
+`src/routes` are exempt: wiring features together and mounting pages is precisely their job.
+
+**Shared vocabulary lives in `shared/domain`, and holds vocabulary only.** A type belongs in the
+shared kernel when two or more features must agree on it to describe the same thing, and no single
+feature may change it unilaterally. `UserId` and `ProjectId` qualify — `Project.ownerId` being a
+`UserId` is not the session feature's private opinion. `TaskId` deliberately does not: no other
+feature needs to name a task, so it stays in `features/tasks/domain`. That asymmetry is the rule made
+visible. The kernel may not import a transport, a cache, or the container; the moment it can, it
+stops being vocabulary and becomes the junk drawer every shared kernel dies of.
+
+The result is that one feature-to-feature dependency exists in the codebase — `TaskList` needs the
+signed-in user to offer "assign to me" — and it goes through a published surface.
+
+#### Composition and object style
+
+`createAppRuntime()` registers shared infrastructure, invokes each feature's `add*Module()` function,
+and builds the object graph before React renders. Feature code never receives the complete runtime or
+resolver.
+
+`shared/ioc` is a framework-neutral typed container plus a thin React bridge, deliberately shaped
+like `Microsoft.Extensions.DependencyInjection` so both composition roots read the same way. Typed
+symbol tokens avoid string collisions and decorators. It rejects missing, duplicate, and circular
+registrations, prevents singletons from capturing scoped services, supports child-scope overrides,
+and exposes singleton, scoped, and transient lifetimes. Instances are created eagerly at build time,
+so `useService()` during render is a pure cache read rather than a side effect. See
+[`frontend/src/shared/ioc/README.md`](frontend/src/shared/ioc/README.md) for why the wheel was
+rebuilt and what would have to change for an off-the-shelf container to win.
+
+A route or module needing an isolated lifetime wraps its subtree in `ServiceScopeProvider`, passing a
+stable resource identity as `scopeKey`:
+
+```tsx
+<ServiceScopeProvider scopeKey={projectId} configure={addTasksWorkspaceScope}>
+  <ProjectWorkspacePage />
+</ServiceScopeProvider>
+```
+
+Ports stay TypeScript interfaces. Stateful adapters and application services are constructor-injected
+classes. Components, hooks, registration functions, cache configuration, DTO mappings, and pure
+domain operations stay functions. A class earns its place through dependency ownership, state,
+identity, or lifecycle — not merely because the code lives outside React.
+
+#### State ownership
+
+| State | Owner |
+| --- | --- |
+| Projects returned by REST | TanStack Query |
+| Tasks returned by GraphQL | TanStack Query |
+| Current authenticated user | TanStack Query session cache |
+| OIDC protocol, tokens, and session cookie | ASP.NET authentication adapter |
+| Selected resource and shareable navigation state | Router path/search parameters |
+| Form values and validation | React Hook Form |
+| Project-scoped task filter | MobX view store (see *Known deviations*) |
+| Other local interaction state | React |
+| Stable gateways and services | Typed IoC registrations through focused feature hooks |
+
+Server data is never copied into MobX. REST and GraphQL feed one server-state cache, and components
+consume TaskFlow-owned presentation models rather than the library's result objects. When state must
+be shared, choose its owner by meaning rather than reach: API-derived data belongs to its feature's
+server-state engine; selections, filters and sorting belong in the URL; form state belongs to React
+Hook Form; transient interaction state lifts to the nearest common component. A client store must
+never duplicate Query, Router, or form state.
+
+#### Transport boundary
+
+`openapi-typescript` generates `src/shared/api/schema.d.ts` from the running API, and generated
+transport types stay inside HTTP adapters. Adapters map DTOs and RFC Problem Details into frontend
+models and `AppError`; components never import generated schemas or call `fetch`.
+
+Tasks use a second delivery path behind an identical seam. `TasksGateway` is a plain application
+port; its adapter posts typed GraphQL documents to `/api/graphql`. The GraphQL library is
+deliberately demoted to a transport: `shared/graphql/client.ts` is a small typed `fetch` client
+carrying the same antiforgery header and 401 policy as the REST client, and resolver errors are
+translated through the same code-to-`AppError` table. Swapping a feature's transport replaces its
+adapter and nothing else — the port, presentation hooks, component contract, and domain model are
+untouched. The heterogeneous transports exist to prove that boundary is real.
+
+Authentication follows the same shape. The session layer depends on an `AuthenticationGateway` whose
+adapter calls stable TaskFlow endpoints. ASP.NET owns the OIDC protocol and the session cookie, so
+replacing Keycloak with another provider does not change a single frontend feature.
+
+## Rules that fail the build
+
+Architecture that lives only in documentation drifts. Each rule here is executable, and each was
+verified to fail before being trusted.
+
+| Rule | Enforced by |
+| --- | --- |
+| Backend layers may not depend outward | Project references |
+| No warnings, current analyzer set, enforced code style | `backend/Directory.Build.props` |
+| No ambient clock — inject `TimeProvider` | `backend/BannedSymbols.txt` (RS0030) |
+| Frontend layer direction, no circular imports | `.dependency-cruiser.cjs` |
+| Cross-feature imports go through the front door | `cross-feature-imports-use-the-front-door` |
+| The shared kernel holds vocabulary, not logic | `shared-kernel-holds-vocabulary-not-logic` |
+| The architecture explorer still describes this codebase | `architectureModel.test.ts` |
+
+The dependency-cruiser configuration sets `tsPreCompilationDeps`, so `import type` counts. A type-only
+import is erased at runtime but is still an architectural dependency: a domain layer importing a type
+from another feature is coupled to it whether or not the bundler can tell.
+
+The explorer test is the answer to a specific failure mode — a hand-curated diagram of a moving
+codebase rots silently, because a renamed file leaves a dead link and a moved declaration leaves a
+confident sentence about code that is no longer there, and nothing fails. It asserts that every
+source link resolves, every highlighted snippet is still present in the file it points at, every edge
+connects nodes that exist, and every view is reachable. Highlights are anchored by code snippet
+rather than line number precisely so that drift breaks the suite instead of quietly mispointing.
 
 ## Stack
 
@@ -116,14 +241,13 @@ application dependency.
 ```text
 TaskFlow/
 |-- backend/             .NET solution, production projects, and tests
-|-- frontend/            React/Vite application and architecture rules
+|-- frontend/            React/Vite application, architecture rules, and browser tests
 |-- infra/keycloak/      Local OIDC realm configuration
 |-- docker-compose.yml   PostgreSQL and Keycloak development services
-|-- PROGRESS.md          Learning journal and roadmap
 `-- README.md
 ```
 
-## Run Locally
+## Run locally
 
 Prerequisites: .NET 10 SDK, the `dotnet-ef` tool, Docker Compose, and pnpm 10.
 
@@ -156,6 +280,7 @@ Password: taskflow
 | Service  | URL                                     |
 | -------- | --------------------------------------- |
 | Frontend | `http://localhost:5173`                 |
+| Explorer | `http://localhost:5173/architecture`    |
 | API      | `http://localhost:5131`                 |
 | Swagger  | `http://localhost:5131/swagger`         |
 | OpenAPI  | `http://localhost:5131/openapi/v1.json` |
@@ -163,12 +288,10 @@ Password: taskflow
 
 The committed credentials and OIDC client secret are for local development only.
 
-## Quality Gates
+The Vite dev server proxies `/api` to the API, so start the backend before using connected screens.
+Route files live in `frontend/src/routes`; `routeTree.gen.ts` is generated and must not be edited.
 
-`backend/Directory.Build.props` sets `TreatWarningsAsErrors`, `EnableNETAnalyzers` and
-`EnforceCodeStyleInBuild`, so the bar is part of the build rather than a flag you have to remember.
-`backend/BannedSymbols.txt` makes reaching for an ambient clock instead of `TimeProvider` a compile
-error.
+## Checks
 
 ```bash
 dotnet build backend/TaskFlow.slnx
@@ -180,27 +303,26 @@ pnpm --dir frontend test
 pnpm --dir frontend build
 ```
 
-The frontend suite includes `architectureModel.test.ts`, which holds the interactive explorer to the
-codebase it claims to describe: every source link must resolve, every highlighted snippet must still
-exist in its file, and every view must be reachable. A diagram nobody can trust is worse than none.
+The build is the quality bar: `Directory.Build.props` sets warnings-as-errors, analyzers, and
+enforced code style solution-wide, so there is no flag to remember.
 
-The browser suite uses isolated, disposable PostgreSQL and Keycloak containers:
+The browser suite runs against disposable PostgreSQL and Keycloak containers on separate ports. It
+does not touch the normal development volumes and can run beside the development stack:
 
 ```bash
 pnpm --dir frontend exec playwright install chromium
 pnpm --dir frontend test:e2e
 ```
 
-Run the API before regenerating the TypeScript transport contract:
+Run the API before regenerating the typed transport contracts:
 
 ```bash
-pnpm --dir frontend generate:api
+pnpm --dir frontend generate:api        # OpenAPI -> TypeScript
+pnpm --dir frontend generate:graphql    # SDL export -> typed documents
 ```
 
-## Architecture Graphs
-
-The Mermaid diagrams above are hand-maintained conceptual views and render directly on GitHub.
-Dependency Cruiser provides implementation-level validation and can also generate a frontend graph:
+Dependency Cruiser can also emit a file-level graph for local investigation. The Mermaid diagrams
+above are hand-maintained conceptual views and should stay small and stable:
 
 ```bash
 cd frontend
@@ -208,19 +330,22 @@ pnpm exec depcruise src --config .dependency-cruiser.cjs \
   --include-only '^src' --output-type mermaid
 ```
 
-Conceptual diagrams should remain small and stable. Generated file-level graphs are useful for local
-investigation but become noisy, so they are supplemental rather than the primary documentation.
+## Scope
 
-## Next Steps
+Deliberately absent, because they would add volume without adding architectural information:
+production containers and a reverse proxy, richer task transitions, collaboration and authorization
+beyond single-owner access, and horizontal concerns such as caching, messaging, or background jobs.
+The patterns here are meant to survive their addition, not to pre-empt it.
 
-- Add a CI workflow so the quality gates above run on every push, including a contract-drift job
-  that re-exports the GraphQL SDL and OpenAPI document and fails on a diff.
-- Add integration tests over a Testcontainers PostgreSQL instance. The headline persistence
-  behaviours — the `Email` value-converter round trip and the `xmin` concurrency token — are
-  currently asserted in prose here and nowhere in code.
-- Surface the concurrency token in the task and project DTOs so a client can participate in
-  optimistic concurrency; today `AppError`'s `conflict` kind has no producer a user can reach.
-- Move the task filter to router search params and retire the single MobX store, per the state
-  ownership rules in `frontend/ARCHITECTURE.md`.
-- Expose start/reopen task transitions when the UI needs a fuller workflow.
-- Add API/frontend containers and a production reverse proxy.
+Acknowledged gaps: there is no CI workflow yet, so the checks above run on demand rather than on
+every push. Persistence behaviour — the `Email` value-converter round trip and the `xmin` concurrency
+token — is described here but not yet covered by integration tests against a real database.
+
+### Known deviations
+
+The project-scoped task filter is shareable, bookmarkable state that survives a reload, which by the
+rules on this page makes it router search-param state. It currently lives in a MobX view store, so a
+deep link loses the active filter. The store exists mainly to demonstrate the scoped-service pattern,
+which is a weak reason for it to own state the rules assign elsewhere. The intended resolution is to
+move the filter into `validateSearch` and retire the store. It is recorded here rather than quietly
+tolerated.

@@ -15,12 +15,12 @@ public sealed class TaskItemTests
     {
         var projectId = Guid.NewGuid();
 
-        var task = TaskItem.Create(projectId, "  Write tests  ", _timeProvider, TaskPriority.High, "Phase 5");
+        var task = TaskItem.Create(projectId, "  Write tests  ", _timeProvider, TaskPriority.High, "Cover the domain rules");
 
         task.Id.Should().NotBeEmpty();
         task.ProjectId.Should().Be(projectId);
         task.Title.Should().Be("Write tests");
-        task.Description.Should().Be("Phase 5");
+        task.Description.Should().Be("Cover the domain rules");
         task.Priority.Should().Be(TaskPriority.High);
         task.Status.Should().Be(TaskItemStatus.Todo);
         task.CreatedAt.Should().Be(CreatedAt);

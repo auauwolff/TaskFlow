@@ -41,7 +41,7 @@ public sealed class TaskServiceTests
     public async Task CreateAsync_ValidRequest_VerifiesProjectAddsAndSaves()
     {
         var project = Project.Create("TaskFlow", _ownerId, _timeProvider);
-        var request = new CreateTaskRequest(project.Id, "  Write tests  ", TaskPriority.High, "Phase 5");
+        var request = new CreateTaskRequest(project.Id, "  Write tests  ", TaskPriority.High, "Cover the domain rules");
         TaskItem? addedTask = null;
         _projects.GetByIdAsync(project.Id, Arg.Any<CancellationToken>()).Returns(project);
         _tasks.AddAsync(Arg.Do<TaskItem>(task => addedTask = task), Arg.Any<CancellationToken>())
