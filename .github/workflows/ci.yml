@@ -21,10 +21,10 @@ jobs:
     name: Backend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # global.json pins the SDK, so the version lives in one place rather than here as well.
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: backend/global.json
 
@@ -48,12 +48,15 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      # packageManager in package.json pins the pnpm version; corepack honours it.
-      - uses: pnpm/action-setup@v4
+      # The pnpm version stays pinned by packageManager in package.json rather than repeated here,
+      # but that file is in frontend/ and the action looks at the repository root by default.
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend/package.json
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
